@@ -1,4 +1,4 @@
-function fearCellActivity(md)
+function eventsInThisBlock = fearCellActivity(md)
 %
 %
 %
@@ -25,4 +25,5 @@ function fearCellActivity(md)
     xlabel('Time (5 min. bins)');
     set(gca,'xtick',[1 2 3 4 5 6]);
     xlim([.5 6.5])
+    make_plot_pretty(gca);
 end
