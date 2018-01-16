@@ -11,7 +11,6 @@ function FinalOutput_from_Mosaic(md)
     
     %Load an example cell to get imaging dimensions. 
     tifs = natsortfiles(cellstr(ls('*.tif'))); 
-    tifs = natsortfiles(cellstr(ls('*.tif'))); 
     nNeurons = length(tifs);
     
 %%

@@ -1,8 +1,8 @@
-session = MD(312); 
+session = MD(319); 
 
 traces = readTraces(session);
 [fearCells,events,t] = getFearBoxCells(session);
-cherryPicked = [28 29 53 26 22 21 18 10 7 67];
+cherryPicked = [3:10 16 22];
 
 figure('Position',[590 240 340 640]);
 n = 10;
@@ -25,7 +25,6 @@ axis on;
 proj = imread('MaxProj.tif'); 
 figure('Position',[950 260 760 620]);
 imshow(proj,[]);
-caxis([0 1700]);
 hold on;
 PlotNeurons(session,1:size(traces,1),[0.5843    0.8157    0.9882],1);
 PlotNeurons(session,fearCells(cherryPicked)',c,3);
