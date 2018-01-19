@@ -9,7 +9,7 @@ from os import path
 from pickle import load, dump
 from pandas import read_csv
 from numpy import delete
-from plot_helper import scroll
+from plot_helper import ScrollPlot
 import matplotlib.pyplot as plt
 
 master_directory = 'U:\Fear conditioning project_Mosaic2\SessionDirectories'
@@ -79,16 +79,6 @@ def plot_traces(session_index,neurons):
     #Load the traces.
     [traces,accepted,t] = load_traces(session_index)
     
-    #Make the figure then connect it to keyboard inputs. 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    fig.canvas.mpl_connect('key_press_event',lambda event: 
-                            scroll(event,t,traces[neurons],ax,fig))
-        
-    #Plot the first time series. Then subsequent arrow key strokes will scroll
-    #through different neurons.
-    ax.plot(t,traces[neurons[0]])
-    plt.xlabel('Time (s)')
-    plt.ylabel('% DF/F')
+    #Scroll through. 
+    ScrollPlot(t,traces[neurons],'Time (s)','%DF/F')
     
- 
