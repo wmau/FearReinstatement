@@ -13,8 +13,9 @@ from plot_helper import ScrollPlot
 import matplotlib.pyplot as plt
 
 master_directory = 'U:\Fear conditioning project_Mosaic2\SessionDirectories'
-file = path.join(master_directory,'SessionDirectories.pkl')
-session_list = load(open(file,'rb'))
+file = path.join(master_directory, 'SessionDirectories.pkl')
+session_list = load(open(file, 'rb'))
+
 
 def load_traces(session_index):
     """ 
@@ -24,61 +25,61 @@ def load_traces(session_index):
     on a session.
     
     """
-    
-    #Get the directory.
-    session_directory = session_list[session_index]["Location"]
-    
-    #Reading the CSV takes a few seconds. If we've already done this step, 
-    #instead just load the saved data. 
-    try:
-        with open(path.join(session_directory,'CelLData.pkl'),'rb') as data:
-            [traces,accepted,t] = load(data)
-            
-    except:
-        #Get file name.
-        trace_file = path.join(session_directory,'Traces.csv')
-    
-        #Get accepted/rejected list. 
-        with open(trace_file,'r') as csv_file:
-            accepted_csv = read_csv(csv_file,nrows=1).T  
-            
-        #Delete the first row, which is like a header. 
-        accepted_csv = accepted_csv.iloc[1:]
-        
-        #Turn this thing into a logical. 
-        neuron_count = len(accepted_csv)
-        accepted = [False]*neuron_count
-        for cell in range(0,neuron_count):
-            if accepted_csv.iloc[cell,0] == ' accepted':
-                accepted[cell] = True
-        
-        #For reasons I don't understand yet, read_csv modifies your position on 
-        #the CSV file so we need to reload the file. Now, actually get the traces. 
-        with open(trace_file,'r') as csv_file:
-            traces = read_csv(csv_file,skiprows=2).T.as_matrix()
-            
-        #Extract the time vector. 
-        t = traces[0,:] 
-        
-        #Delete time vector from traces. 
-        traces = delete(traces,(0),axis=0)
-               
-        #Save data.
-        with open(path.join(session_directory,'CellData.pkl'),'wb') as output:
-            dump([traces,accepted,t],output)
-        
-    return traces,accepted,t
 
-def plot_traces(session_index,neurons):
+    # Get the directory.
+    session_directory = session_list[session_index]["Location"]
+
+    # Reading the CSV takes a few seconds. If we've already done this step,
+    # instead just load the saved data.
+    try:
+        with open(path.join(session_directory, 'CelLData.pkl'), 'rb') as data:
+            [traces, accepted, t] = load(data)
+
+    except:
+        # Get file name.
+        trace_file = path.join(session_directory, 'Traces.csv')
+
+        # Get accepted/rejected list.
+        with open(trace_file, 'r') as csv_file:
+            accepted_csv = read_csv(csv_file, nrows=1).T
+
+            # Delete the first row, which is like a header.
+        accepted_csv = accepted_csv.iloc[1:]
+
+        # Turn this thing into a logical.
+        neuron_count = len(accepted_csv)
+        accepted = [False] * neuron_count
+        for cell in range(0, neuron_count):
+            if accepted_csv.iloc[cell, 0] == ' accepted':
+                accepted[cell] = True
+
+        # For reasons I don't understand yet, read_csv modifies your position on
+        # the CSV file so we need to reload the file. Now, actually get the traces.
+        with open(trace_file, 'r') as csv_file:
+            traces = read_csv(csv_file, skiprows=2).T.as_matrix()
+
+        # Extract the time vector.
+        t = traces[0, :]
+
+        # Delete time vector from traces.
+        traces = delete(traces, (0), axis=0)
+
+        # Save data.
+        with open(path.join(session_directory, 'CellData.pkl'), 'wb') as output:
+            dump([traces, accepted, t], output)
+
+    return traces, accepted, t
+
+
+def plot_traces(session_index, neurons):
     """
     
     Plot the traces of multiple neurons. You can scroll between neurons!
     
     """
- 
-    #Load the traces.
-    [traces,accepted,t] = load_traces(session_index)
-    
-    #Scroll through. 
-    ScrollPlot(t,traces[neurons],'Time (s)','%DF/F')
-    
+
+    # Load the traces.
+    [traces, accepted, t] = load_traces(session_index)
+
+    # Scroll through.
+    ScrollPlot(t, traces[neurons], 'Time (s)', '%DF/F')
