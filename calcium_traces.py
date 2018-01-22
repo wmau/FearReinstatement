@@ -5,10 +5,7 @@ Created on Wed Jan 17 14:11:14 2018
 @author: William Mau
 """
 
-from os import path
-from pickle import load, dump
-from pandas import read_csv
-from numpy import delete
+from cell_data_compiler import CellData
 from plot_helper import ScrollPlot
 from session_directory import load_session_list
 
@@ -23,7 +20,6 @@ def check_session(session_index):
     :return
         Printed session information.
     """
-    session_directory = session_list[session_index]["Location"]
 
     print("Mouse: " + session_list[session_index]["Animal"])
     print("Date: " + session_list[session_index]["Date"])
@@ -45,49 +41,9 @@ def load_traces(session_index):
         t: Vector of timestamps.
     """
 
-    # Get the directory.
-    session_directory = session_list[session_index]["Location"]
+    data = CellData(session_index)
 
-    # Reading the CSV takes a few seconds. If we've already done this step,
-    # instead just load the saved data.
-    try:
-        with open(path.join(session_directory, 'CellData.pkl'), 'rb') as data:
-            [traces, accepted, t] = load(data)
-
-    except:
-        # Get file name.
-        trace_file = path.join(session_directory, 'Traces.csv')
-
-        # Get accepted/rejected list.
-        with open(trace_file, 'r') as csv_file:
-            accepted_csv = read_csv(csv_file, nrows=1).T
-
-        # Delete the first row, which is like a header.
-        accepted_csv = accepted_csv.iloc[1:]
-
-        # Turn this thing into a logical.
-        neuron_count = len(accepted_csv)
-        accepted = [False] * neuron_count
-        for cell in range(0, neuron_count):
-            if accepted_csv.iloc[cell, 0] == ' accepted':
-                accepted[cell] = True
-
-        # For reasons I don't understand yet, read_csv modifies your position on
-        # the CSV file so we need to reload the file. Now, actually get the traces.
-        with open(trace_file, 'r') as csv_file:
-            traces = read_csv(csv_file, skiprows=2).T.as_matrix() #Need to transpose here.
-
-        # Extract the time vector.
-        t = traces[0, :]
-
-        # Delete time vector from traces.
-        traces = delete(traces, 0, axis=0)
-
-        # Save data.
-        with open(path.join(session_directory, 'CellData.pkl'), 'wb') as output:
-            dump([traces, accepted, t], output)
-
-    return traces, accepted, t
+    return data.traces, data.accepted, data.t
 
 
 def plot_traces(session_index, neurons):
