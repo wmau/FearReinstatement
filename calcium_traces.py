@@ -10,11 +10,9 @@ from pickle import load, dump
 from pandas import read_csv
 from numpy import delete
 from plot_helper import ScrollPlot
+from session_directory import load_session_list
 
-master_directory = 'U:\Fear conditioning project_Mosaic2\SessionDirectories'
-file = path.join(master_directory, 'SessionDirectories.pkl')
-session_list = load(open(file, 'rb'))
-
+session_list = load_session_list()
 
 def check_session(session_index):
     """
@@ -77,7 +75,7 @@ def load_traces(session_index):
         # For reasons I don't understand yet, read_csv modifies your position on
         # the CSV file so we need to reload the file. Now, actually get the traces.
         with open(trace_file, 'r') as csv_file:
-            traces = read_csv(csv_file, skiprows=2).T.as_matrix()
+            traces = read_csv(csv_file, skiprows=2).T.as_matrix() #Need to transpose here.
 
         # Extract the time vector.
         t = traces[0, :]
