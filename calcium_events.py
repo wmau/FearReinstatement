@@ -24,4 +24,4 @@ def load_events(session_index):
 
     data = CellData(session_index)
 
-    return data.events
+    return data.event_times, data.event_values

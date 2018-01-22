@@ -41,6 +41,7 @@ def load_traces(session_index):
         t: Vector of timestamps.
     """
 
+    #Gather data.
     data = CellData(session_index)
 
     return data.traces, data.accepted, data.t

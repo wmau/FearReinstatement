@@ -24,17 +24,17 @@ class CellData:
                 self.traces = data.traces
                 self.n_ICs = data.n_ICs
                 self.accepted = data.accepted
-                self.events = data.events
+                self.event_times = data.event_times
+                self.event_values = data.event_values
                 self.t = data.t
 
         # If that didn't work, recompile.
         except:
             # Initialize.
             self.traces = []
+            self.t = []
             self.n_ICs = cell_stats.get_number_of_ICs(session_number)
             self.accepted = [False] * self.n_ICs
-            self.events = []
-            self.t = []
 
             # Compile.
             self.compile_all()
@@ -78,10 +78,13 @@ class CellData:
         with open(self.event_file) as csv_file:
             events_csv = DictReader(csv_file)
 
+            self.event_times = [[] for x in range(self.n_ICs)]
+            self.event_values = [[] for x in range(self.n_ICs)]
             # Gather calcium events.
             for row in events_csv:
                 ind = int(row[" Cell Name"][2:])
-                self.events[ind].append(float(row["Time (s)"]))
+                self.event_times[ind].append(float(row["Time (s)"]))
+                self.event_values[ind].append(float(row[" Value"]))
 
     def compile_all(self):
         """
@@ -95,3 +98,5 @@ class CellData:
         # Pickle the class instance.
         with open(self.cell_data_file, 'wb') as output:
             dump(self, output)
+
+CellData(0)
