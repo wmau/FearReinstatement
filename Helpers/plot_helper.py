@@ -10,11 +10,19 @@ import matplotlib.pyplot as plt
 class ScrollPlot:
     """ 
     Plot stuff then scroll through it!
+
+    :param
+        x: X axis data.
+        y: Y axis data.
+        xlabel = 'x': X axis label.
+        ylabel = 'y': Y axis label.
+
+
     """
 
     # Initialize the class. Gather the data and labels.
     def __init__(self, x, y, xlabel='x', ylabel='y'):
-        self.fig, self.ax = plt.subplots()
+        [self.fig, self.ax] = plt.subplots()
         self.data = [x, y]
         self.labels = [xlabel, ylabel]
 
@@ -27,8 +35,8 @@ class ScrollPlot:
         self.apply_labels()
 
         # Connect the figure to keyboard arrow keys.
-        self.fig.canvas.mpl_connect('key_press_event', lambda event:
-        self.update_plots(event))
+        self.fig.canvas.mpl_connect('key_press_event',
+                                    lambda event: self.update_plots(event))
 
     # Go up or down the list. Left = down, right = up.
     def scroll(self, event):
@@ -43,17 +51,13 @@ class ScrollPlot:
         plt.ylabel(self.labels[1])
 
     # Update the plot based on keyboard inputs.
-    def update_plots(self, event: object) -> object:
+    def update_plots(self, event):
         # Clear axis.
         self.ax.cla()
 
         # Scroll then update plot.
         self.scroll(event)
-        self.ax.plot(self.data[0], self.data[1][self.current_position, :])
-
-        # Reset axes.
-        self.ax.relim()
-        self.ax.autoscale_view(True, True, True)
+        self.ax.plot(self.data[0], self.data[1][self.current_position,:])
 
         # Draw.
         self.fig.canvas.draw()

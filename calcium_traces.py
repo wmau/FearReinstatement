@@ -10,20 +10,41 @@ from pickle import load, dump
 from pandas import read_csv
 from numpy import delete
 from plot_helper import ScrollPlot
-import matplotlib.pyplot as plt
 
 master_directory = 'U:\Fear conditioning project_Mosaic2\SessionDirectories'
 file = path.join(master_directory, 'SessionDirectories.pkl')
 session_list = load(open(file, 'rb'))
 
 
+def check_session(session_index):
+    """
+    Displays all the details of that session as recorded in the CSV file.
+
+    :param
+        session_index: number corresponding to a session.
+    :return
+        Printed session information.
+    """
+    session_directory = session_list[session_index]["Location"]
+
+    print("Mouse: " + session_list[session_index]["Animal"])
+    print("Date: " + session_list[session_index]["Date"])
+    print("Session # that day: " + session_list[session_index]["Session"])
+    print("Location: " + session_list[session_index]["Location"])
+    print("Notes: " + session_list[session_index]["Notes"])
+
 def load_traces(session_index):
-    """ 
-    
+    """
     Load traces from data of single sessions saved via Inscopix Data Processing
     software. This may take a few seconds to run if running for the first time 
     on a session.
-    
+
+    :param
+        session_index: number corresponding to a session.
+    :return
+        traces: Array of cell traces.
+        accepted: List of accepted cells.
+        t: Vector of timestamps.
     """
 
     # Get the directory.
@@ -32,7 +53,7 @@ def load_traces(session_index):
     # Reading the CSV takes a few seconds. If we've already done this step,
     # instead just load the saved data.
     try:
-        with open(path.join(session_directory, 'CelLData.pkl'), 'rb') as data:
+        with open(path.join(session_directory, 'CellData.pkl'), 'rb') as data:
             [traces, accepted, t] = load(data)
 
     except:
@@ -43,7 +64,7 @@ def load_traces(session_index):
         with open(trace_file, 'r') as csv_file:
             accepted_csv = read_csv(csv_file, nrows=1).T
 
-            # Delete the first row, which is like a header.
+        # Delete the first row, which is like a header.
         accepted_csv = accepted_csv.iloc[1:]
 
         # Turn this thing into a logical.
@@ -62,7 +83,7 @@ def load_traces(session_index):
         t = traces[0, :]
 
         # Delete time vector from traces.
-        traces = delete(traces, (0), axis=0)
+        traces = delete(traces, 0, axis=0)
 
         # Save data.
         with open(path.join(session_directory, 'CellData.pkl'), 'wb') as output:
@@ -73,13 +94,19 @@ def load_traces(session_index):
 
 def plot_traces(session_index, neurons):
     """
-    
     Plot the traces of multiple neurons. You can scroll between neurons!
-    
+
+    :param
+        session_index: Number corresponding to a session.
+        neurons: List of neurons.
+    :return
     """
 
     # Load the traces.
     [traces, accepted, t] = load_traces(session_index)
 
     # Scroll through.
-    ScrollPlot(t, traces[neurons], 'Time (s)', '%DF/F')
+    f = ScrollPlot(t, traces[neurons], 'Time (s)', '%DF/F')
+
+    # Gets the ScrollPlot object.
+    return f
