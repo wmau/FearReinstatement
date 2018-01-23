@@ -3,7 +3,7 @@ from os import path
 from pandas import read_csv
 from csv import DictReader
 from pickle import dump, load
-from numpy import delete
+from numpy import delete,array
 from session_directory import load_session_list
 
 session_list = load_session_list()
@@ -85,6 +85,10 @@ class CellData:
                 ind = int(row[" Cell Name"][2:])
                 self.event_times[ind].append(float(row["Time (s)"]))
                 self.event_values[ind].append(float(row[" Value"]))
+
+        # Turn a list of lists into an array of lists. This will make indexing easier.
+        self.event_times = array(self.event_times)
+        self.event_values = array(self.event_values)
 
     def compile_all(self):
         """

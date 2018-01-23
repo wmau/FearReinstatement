@@ -21,17 +21,21 @@ class ScrollPlot:
     """
 
     # Initialize the class. Gather the data and labels.
-    def __init__(self, x, y, xlabel='x', ylabel='y'):
+    def __init__(self, plot_func, xlabel = 'x', ylabel = 'y', titles = (["Title"] * 1000), **kwargs):
+        self.plot_func = plot_func
         [self.fig, self.ax] = plt.subplots()
-        self.data = [x, y]
-        self.labels = [xlabel, ylabel]
+        self.xlabel = xlabel
+        self.ylabel = ylabel
+        self.titles = titles
+
+        for key,value in kwargs.items():
+            setattr(self,key,value)
 
         # Necessary for scrolling.
-        self.last_position = len(y) - 1
         self.current_position = 0
 
-        # Plot the first time series.
-        self.ax.plot(x, y[0, :])
+        # Plot the first time series and label.
+        self.plot_func(self)
         self.apply_labels()
 
         # Connect the figure to keyboard arrow keys.
@@ -47,8 +51,9 @@ class ScrollPlot:
 
     # Apply axis labels.
     def apply_labels(self):
-        plt.xlabel(self.labels[0])
-        plt.ylabel(self.labels[1])
+        plt.xlabel(self.xlabel)
+        plt.ylabel(self.ylabel)
+        plt.title(self.titles[self.current_position])
 
     # Update the plot based on keyboard inputs.
     def update_plots(self, event):
@@ -57,9 +62,15 @@ class ScrollPlot:
 
         # Scroll then update plot.
         self.scroll(event)
-        self.ax.plot(self.data[0], self.data[1][self.current_position,:])
+
+        # Run the plotting function.
+        self.plot_func(self)
 
         # Draw.
         self.fig.canvas.draw()
         self.apply_labels()
 
+def neuron_number_title(neurons):
+    titles = ["Neuron: " + str(n) for n in neurons]
+
+    return titles

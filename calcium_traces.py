@@ -6,8 +6,9 @@ Created on Wed Jan 17 14:11:14 2018
 """
 
 from cell_data_compiler import CellData
-from plot_helper import ScrollPlot
+from plot_helper import ScrollPlot, neuron_number_title
 from session_directory import load_session_list
+import plot_functions as plot_funcs
 
 session_list = load_session_list()
 
@@ -61,7 +62,10 @@ def plot_traces(session_index, neurons):
     [traces, accepted, t] = load_traces(session_index)
 
     # Scroll through.
-    f = ScrollPlot(t, traces[neurons], 'Time (s)', '%DF/F')
+    titles = neuron_number_title(neurons)
+    f = ScrollPlot(plot_funcs.plot_traces,
+                   t = t, traces = traces[neurons],
+                   xlabel = 'Time (s)', ylabel = '%DF/F',titles = titles)
 
     # Gets the ScrollPlot object.
     return f
