@@ -28,6 +28,7 @@ def check_session(session_index):
     print("Location: " + session_list[session_index]["Location"])
     print("Notes: " + session_list[session_index]["Notes"])
 
+
 def load_traces(session_index):
     """
     Load traces from data of single sessions saved via Inscopix Data Processing
