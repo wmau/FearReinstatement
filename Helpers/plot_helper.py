@@ -21,13 +21,14 @@ class ScrollPlot:
     """
 
     # Initialize the class. Gather the data and labels.
-    def __init__(self, plot_func, xlabel = 'x', ylabel = 'y', titles = (["Title"] * 1000), **kwargs):
+    def __init__(self, plot_func, xlabel = 'x', ylabel = 'y', titles = (["Title"] * 10000), **kwargs):
         self.plot_func = plot_func
         [self.fig, self.ax] = plt.subplots()
         self.xlabel = xlabel
         self.ylabel = ylabel
         self.titles = titles
 
+        # Dump all arguments into ScrollPlot.
         for key,value in kwargs.items():
             setattr(self,key,value)
 
@@ -69,6 +70,7 @@ class ScrollPlot:
         # Draw.
         self.fig.canvas.draw()
         self.apply_labels()
+
 
 def neuron_number_title(neurons):
     titles = ["Neuron: " + str(n) for n in neurons]

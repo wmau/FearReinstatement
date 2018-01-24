@@ -1,12 +1,13 @@
 from glob import glob
 from os import path
-
+from plot_helper import ScrollPlot
 import matplotlib.pyplot as plt
 import pygame
 import skvideo.io
 from pandas import read_csv
 from PIL import Image
 from session_directory import load_session_list
+import plot_functions as plot_funcs
 
 session_list = load_session_list()
 
@@ -15,6 +16,7 @@ class FFObj:
         self.session_index = session_index
         self.csv_location, self.avi_location = self.get_ff_files()
         self.movie = skvideo.io.vread(self.avi_location)
+        self.n_frames = len(self.movie)
         self.t = self.get_timestamps()
 
     def get_ff_files(self):
@@ -37,6 +39,15 @@ class FFObj:
 
         t = data.iloc[:, 0]
         return t
+
+    def scroll_through_frames(self):
+        titles = ["Frame " + str(n) for n in range(self.n_frames)]
+
+        ScrollPlot(plot_funcs.display_frame,
+                   movie = self.movie, n_frames = self.n_frames,
+                   titles = titles)
+
+        pass
 
     def select_region(self):
         frameObj = FrameSelector(Image.fromarray(self.movie[1, :, :]))
@@ -148,3 +159,6 @@ class FrameSelector:
 
     def terminate(self):
         pygame.display.quit()
+
+#FF = FFObj(0)
+#FF.scroll_through_frames()
