@@ -12,6 +12,7 @@ import plot_functions as plot_funcs
 
 session_list = load_session_list()
 
+
 def check_session(session_index):
     """
     Displays all the details of that session as recorded in the CSV file.
@@ -43,7 +44,7 @@ def load_traces(session_index):
         t: Vector of timestamps.
     """
 
-    #Gather data.
+    # Gather data.
     data = CellData(session_index)
 
     return data.traces, data.accepted, data.t
@@ -65,8 +66,8 @@ def plot_traces(session_index, neurons):
     # Scroll through.
     titles = neuron_number_title(neurons)
     f = ScrollPlot(plot_funcs.plot_traces,
-                   t = t, traces = traces[neurons],
-                   xlabel = 'Time (s)', ylabel = '%DF/F',titles = titles)
+                   t=t, traces=traces[neurons],
+                   xlabel='Time (s)', ylabel='%DF/F', titles=titles)
 
     # Gets the ScrollPlot object.
     return f

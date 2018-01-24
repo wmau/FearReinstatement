@@ -24,8 +24,6 @@ def load_events(session_index):
     :return
         events:
     """
-    session_directory = session_list[session_index]["Location"]
-
     data = CellData(session_index)
 
     return data.event_times, data.event_values
