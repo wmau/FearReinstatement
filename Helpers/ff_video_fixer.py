@@ -6,18 +6,24 @@ import pygame
 import skvideo.io
 from pandas import read_csv
 from PIL import Image
+import numpy as np
 from session_directory import load_session_list
 import plot_functions as plot_funcs
+from scipy.ndimage.filters import gaussian_filter as gfilt
 
 session_list = load_session_list()
 
+
 class FFObj:
-    def __init__(self, session_index):
+    def __init__(self, session_index, stitch=True):
         self.session_index = session_index
         self.csv_location, self.avi_location = self.get_ff_files()
         self.movie = skvideo.io.vread(self.avi_location)
         self.n_frames = len(self.movie)
         self.t = self.get_timestamps()
+
+        if stitch:
+            self.get_baseline_frame()
 
     def get_ff_files(self):
         ff_dir = path.join(session_list[self.session_index]["Location"], "FreezeFrame")
@@ -43,19 +49,57 @@ class FFObj:
     def scroll_through_frames(self):
         titles = ["Frame " + str(n) for n in range(self.n_frames)]
 
-        ScrollPlot(plot_funcs.display_frame,
-                   movie = self.movie, n_frames = self.n_frames,
-                   titles = titles)
+        f = ScrollPlot(plot_funcs.display_frame,
+                       movie=self.movie, n_frames=self.n_frames,
+                       titles=titles)
 
-        pass
+        return f
 
-    def select_region(self):
-        frameObj = FrameSelector(Image.fromarray(self.movie[1, :, :]))
-
+    def select_region(self, frame_num):
+        # Convert frame into image object then pass through the FrameSelector class.
+        frame = Image.fromarray(self.movie[frame_num])
+        frameObj = FrameSelector(frame)
         frameObj.setup()
-        rectangle = frameObj.loop_through()
+        region = frameObj.loop_through()
+        frameObj.terminate()
 
-        return rectangle
+        # Obtain the image from the selected ROI.
+        chunk = frame.crop(region)
+        return chunk, region
+
+    def stitch_baseline_frame(self, from_frame, to_frame):
+        """
+        Crop a region from from_frame and paste it to to_frame.
+        :param from_frame:
+        :param to_frame:
+        :return:
+        """
+        chunk, region = self.select_region(from_frame)
+        paste_onto_me = Image.fromarray(self.movie[to_frame])
+
+        paste_onto_me.paste(chunk, region)
+        self.baseline_frame = paste_onto_me
+
+    def get_baseline_frame(self):
+        f = self.scroll_through_frames()
+        fig_num = f.fig.number
+
+        while plt.fignum_exists(fig_num):
+            plt.waitforbuttonpress(0)
+
+        else:
+            from_frame = int(input("From what frame do you want to cut out a region?"))
+            to_frame = int(input("On what frame do you want to paste that region?"))
+
+        self.stitch_baseline_frame(from_frame, to_frame)
+
+    def auto_detect_mouse(self,smooth_sigma):
+        MouseDetectorObj = MouseDetector(self.baseline_frame,self.movie,smooth_sigma)
+
+        titles = ["Frame " + str(n) for n in range(self.n_frames)]
+        f = ScrollPlot(plot_funcs.display_frame,
+                       movie=MouseDetectorObj.d_movie, n_frames=self.n_frames,
+                       titles=titles)
 
 
 class FrameSelector:
@@ -135,7 +179,7 @@ class FrameSelector:
         n = 0
 
         # Always scan for mouse clicks.
-        while n!= 1:
+        while n != 1:
 
             # Every time an "event" happens...
             for event in pygame.event.get():
@@ -160,5 +204,34 @@ class FrameSelector:
     def terminate(self):
         pygame.display.quit()
 
+
+class MouseDetector:
+    def __init__(self, baseline_frame, movie, sigma):
+        self.movie = movie
+        self.sigma = sigma
+        self.baseline = gfilt(baseline_frame,self.sigma)
+        self.make_difference_movie()
+        self.d_movie = self.make_difference_movie()
+
+    def delta_baseline(self, frame):
+        delta = self.baseline - gfilt(frame,self.sigma)
+
+        return delta
+
+    def make_difference_movie(self):
+        d_movie = np.zeros(self.movie.shape)
+        for i,frame in enumerate(self.movie):
+            d_movie[i] = self.delta_baseline(frame)
+
+        return d_movie
+
+    def detect_mouse(self):
+        # Make movie of contrast frames here.
+        pass
+
+
+# FF = FFObj(0)
+# FF.scroll_through_frames()
 #FF = FFObj(0)
-#FF.scroll_through_frames()
+# FF.inquire_user_for_baseline_inputs()
+#FF.auto_detect_mouse()

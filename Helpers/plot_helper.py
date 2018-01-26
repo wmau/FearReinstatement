@@ -45,9 +45,9 @@ class ScrollPlot:
 
     # Go up or down the list. Left = down, right = up.
     def scroll(self, event):
-        if (event.key == 'right') and (self.current_position < self.last_position):
+        if event.key == 'right' and self.current_position < self.last_position:
             self.current_position += 1
-        elif (event.key == 'left') and (self.current_position > 0):
+        elif event.key == 'left' and self.current_position > 0:
             self.current_position -= 1
 
     # Apply axis labels.
@@ -70,6 +70,9 @@ class ScrollPlot:
         # Draw.
         self.fig.canvas.draw()
         self.apply_labels()
+
+        if event.key == 'escape':
+            plt.close(self.fig)
 
 
 def neuron_number_title(neurons):
