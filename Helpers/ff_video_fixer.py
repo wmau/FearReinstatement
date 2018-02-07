@@ -4,9 +4,11 @@ from plot_helper import ScrollPlot
 import matplotlib.pyplot as plt
 import pygame
 import skvideo.io
+from skimage import color
 from pandas import read_csv
 from PIL import Image
 import numpy as np
+import cv2
 from session_directory import load_session_list
 import plot_functions as plot_funcs
 from scipy.ndimage.filters import gaussian_filter as gfilt
@@ -93,13 +95,9 @@ class FFObj:
 
         self.stitch_baseline_frame(from_frame, to_frame)
 
-    def auto_detect_mouse(self,smooth_sigma):
-        MouseDetectorObj = MouseDetector(self.baseline_frame,self.movie,smooth_sigma)
-
-        titles = ["Frame " + str(n) for n in range(self.n_frames)]
-        f = ScrollPlot(plot_funcs.display_frame,
-                       movie=MouseDetectorObj.d_movie, n_frames=self.n_frames,
-                       titles=titles)
+    def auto_detect_mouse(self, smooth_sigma=6, threshold=150):
+        MouseDetectorObj = MouseDetector(self.baseline_frame, self.movie, smooth_sigma)
+        MouseDetectorObj.detect_mouse(threshold)
 
 
 class FrameSelector:
@@ -208,30 +206,72 @@ class FrameSelector:
 class MouseDetector:
     def __init__(self, baseline_frame, movie, sigma):
         self.movie = movie
+        self.n_frames = len(movie)
         self.sigma = sigma
-        self.baseline = gfilt(baseline_frame,self.sigma)
-        self.make_difference_movie()
+        self.baseline = baseline_frame
         self.d_movie = self.make_difference_movie()
 
     def delta_baseline(self, frame):
-        delta = self.baseline - gfilt(frame,self.sigma)
+        delta = gfilt(frame - self.baseline, self.sigma)
 
         return delta
 
     def make_difference_movie(self):
         d_movie = np.zeros(self.movie.shape)
-        for i,frame in enumerate(self.movie):
+        for i, frame in enumerate(self.movie):
             d_movie[i] = self.delta_baseline(frame)
 
+        d_movie = color.rgb2gray(d_movie)
         return d_movie
 
-    def detect_mouse(self):
-        # Make movie of contrast frames here.
-        pass
+    def threshold_movie(self, d_movie, threshold):
+        thresh_movie = [cv2.inRange(frame, threshold, 255) for frame in d_movie]
+
+        return thresh_movie
+
+    def build_blob_detector(self):
+        params = cv2.SimpleBlobDetector_Params()
+        params.filterByColor = False
+        params.filterByConvexity = False
+        params.filterByInertia = False
+        params.maxThreshold = 255
+        params.maxArea = 10000
+
+        detector = cv2.SimpleBlobDetector_create(params)
+
+        return detector
+
+    def detect_mouse(self, threshold):
+        d_movie = self.make_difference_movie()
+        thresh_movie = self.threshold_movie(d_movie, threshold)
+        detector = self.build_blob_detector()
+
+        position = np.zeros([self.n_frames, 2])
+        for i, frame in enumerate(thresh_movie):
+            blobs = detector.detect(frame)
+
+            blob_sizes = [this_blob.size for this_blob in blobs]
+
+            try:
+                biggest = max(blob_sizes)
+                biggest_blob = blob_sizes.index(biggest)
+
+                position[i] = blobs[biggest_blob].pt
+            except:
+                position[i] = [0, 0]
+
+        titles = ["Frame " + str(n) for n in range(self.n_frames)]
+
+        f = ScrollPlot(plot_funcs.display_frame_and_position,
+                       movie=self.movie, n_frames=self.n_frames, position=position, titles=titles)
+
+        return position
 
 
 # FF = FFObj(0)
 # FF.scroll_through_frames()
-#FF = FFObj(0)
+FF = FFObj(0)
 # FF.inquire_user_for_baseline_inputs()
-#FF.auto_detect_mouse()
+FF.auto_detect_mouse()
+
+pass

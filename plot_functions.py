@@ -45,5 +45,13 @@ def display_frame(obj):
     if obj.current_position == 0:
         obj.current_position = round(obj.n_frames/2)
 
-    obj.ax.imshow(obj.movie[obj.current_position, :, :])
+    obj.ax.imshow(obj.movie[obj.current_position])
+    obj.last_position = obj.n_frames - 1
+
+def display_frame_and_position(obj):
+    if obj.current_position == 0:
+        obj.current_position = round(obj.n_frames/2)
+
+    obj.ax.imshow(obj.movie[obj.current_position])
+    obj.ax.plot(obj.position[obj.current_position,0],obj.position[obj.current_position,1],'ro')
     obj.last_position = obj.n_frames - 1
