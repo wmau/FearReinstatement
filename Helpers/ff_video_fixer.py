@@ -27,6 +27,8 @@ class FFObj:
         if stitch:
             self.get_baseline_frame()
 
+        self.movie = color.rgb2gray(self.movie)
+
     def get_ff_files(self):
         ff_dir = path.join(session_list[self.session_index]["Location"], "FreezeFrame")
         csv_location = glob(path.join(ff_dir, '*.csv'))
@@ -80,7 +82,7 @@ class FFObj:
         paste_onto_me = Image.fromarray(self.movie[to_frame])
 
         paste_onto_me.paste(chunk, region)
-        self.baseline_frame = paste_onto_me
+        self.baseline_frame = color.rgb2gray(np.array(paste_onto_me))
 
     def get_baseline_frame(self):
         f = self.scroll_through_frames()
@@ -95,7 +97,7 @@ class FFObj:
 
         self.stitch_baseline_frame(from_frame, to_frame)
 
-    def auto_detect_mouse(self, smooth_sigma=6, threshold=150):
+    def auto_detect_mouse(self, smooth_sigma=6, threshold=0.15):
         MouseDetectorObj = MouseDetector(self.baseline_frame, self.movie, smooth_sigma)
         MouseDetectorObj.detect_mouse(threshold)
 
@@ -212,7 +214,7 @@ class MouseDetector:
         self.d_movie = self.make_difference_movie()
 
     def delta_baseline(self, frame):
-        delta = gfilt(frame - self.baseline, self.sigma)
+        delta = gfilt(self.baseline - frame, self.sigma)
 
         return delta
 
@@ -221,11 +223,10 @@ class MouseDetector:
         for i, frame in enumerate(self.movie):
             d_movie[i] = self.delta_baseline(frame)
 
-        d_movie = color.rgb2gray(d_movie)
         return d_movie
 
     def threshold_movie(self, d_movie, threshold):
-        thresh_movie = [cv2.inRange(frame, threshold, 255) for frame in d_movie]
+        thresh_movie = [cv2.inRange(frame, threshold, 1) for frame in d_movie]
 
         return thresh_movie
 
@@ -235,7 +236,7 @@ class MouseDetector:
         params.filterByConvexity = False
         params.filterByInertia = False
         params.maxThreshold = 255
-        params.maxArea = 10000
+        params.maxArea = 100000
 
         detector = cv2.SimpleBlobDetector_create(params)
 
