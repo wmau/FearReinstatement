@@ -12,6 +12,7 @@ import cv2
 from session_directory import load_session_list
 import plot_functions as plot_funcs
 from scipy.ndimage.filters import gaussian_filter as gfilt
+import calcium_traces as ca_traces
 
 session_list = load_session_list()
 
@@ -22,7 +23,7 @@ class FFObj:
         self.csv_location, self.avi_location = self.get_ff_files()
         self.movie = skvideo.io.vread(self.avi_location)
         self.n_frames = len(self.movie)
-        self.t = self.get_timestamps()
+        self.video_t = self.get_timestamps()
 
         if stitch:
             self.get_baseline_frame()
@@ -53,7 +54,7 @@ class FFObj:
         with open(self.csv_location, 'r') as csv_file:
             data = read_csv(csv_file)
 
-        t = data.iloc[:, 0]
+        t = np.array(data.iloc[:, 0])
         return t
 
     def scroll_through_frames(self):
@@ -122,8 +123,31 @@ class FFObj:
         self.stitch_baseline_frame(from_frame, to_frame)
 
     def auto_detect_mouse(self, smooth_sigma=6, threshold=0.15):
+        """
+        Find the mouse automatically using preset settings and blob detection.
+        :param
+            smooth_sigma: factor to smooth delta frames by.
+            threshold: intensity cut-off for blob detection.
+        """
         MouseDetectorObj = MouseDetector(self.baseline_frame, self.movie, smooth_sigma)
         self.position = MouseDetectorObj.detect_mouse(threshold)
+
+    def interpolate(self):
+        """
+        Match timestamps and position to imaging.
+        """
+        _,_,imaging_t = ca_traces.load_traces(self.session_index)
+        x = np.interp(imaging_t, self.video_t, self.position[:, 0])
+        y = np.interp(imaging_t, self.video_t, self.position[:, 1])
+
+        return x,y,imaging_t
+
+    def process_video(self):
+        """
+        Main function for detecting mouse and correcting video.
+        """
+        self.auto_detect_mouse()
+        self.x,self.y,self.imaging_t = self.interpolate()
 
 
 class FrameSelector:
@@ -320,5 +344,3 @@ class MouseDetector:
 # FF = FFObj(0)
 # FF.inquire_user_for_baseline_inputs()
 # FF.auto_detect_mouse()
-
-pass
