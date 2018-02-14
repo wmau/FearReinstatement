@@ -21,14 +21,12 @@ class FFObj:
     def __init__(self, session_index, stitch=True):
         self.session_index = session_index
         self.csv_location, self.avi_location = self.get_ff_files()
-        self.movie = skvideo.io.vread(self.avi_location)
+        self.movie = np.squeeze(skvideo.io.vread(self.avi_location,as_grey=True))
         self.n_frames = len(self.movie)
         self.video_t = self.get_timestamps()
 
         if stitch:
             self.get_baseline_frame()
-
-        self.movie = color.rgb2gray(self.movie)
 
     def get_ff_files(self):
         """
@@ -73,11 +71,11 @@ class FFObj:
     def select_region(self, frame_num):
         """
         Selects a region from a frame of your choice.
-        :param frame_num:
-        :return:
+        :param
+            frame_num: frame number.
         """
         # Convert frame into image object then pass through the FrameSelector class.
-        frame = Image.fromarray(self.movie[frame_num])
+        frame = Image.fromarray(self.movie[frame_num],mode='P')
         frameObj = FrameSelector(frame)
         frameObj.setup()
         region = frameObj.loop_through()
@@ -100,7 +98,7 @@ class FFObj:
 
         # Paste and also convert the image to grayscale.
         paste_onto_me.paste(chunk, region)
-        self.baseline_frame = color.rgb2gray(np.array(paste_onto_me))
+        self.baseline_frame = np.array(paste_onto_me)
 
     def get_baseline_frame(self):
         """
@@ -122,7 +120,7 @@ class FFObj:
         # Stitch the partial frames together.
         self.stitch_baseline_frame(from_frame, to_frame)
 
-    def auto_detect_mouse(self, smooth_sigma=6, threshold=0.15):
+    def auto_detect_mouse(self, smooth_sigma=6, threshold=80):
         """
         Find the mouse automatically using preset settings and blob detection.
         :param
@@ -158,6 +156,7 @@ class FrameSelector:
 
     def __init__(self, frame):
         self.frame = frame
+        pygame.init()
 
     def display_frame(self, topleft, prior):
         """
@@ -204,11 +203,16 @@ class FrameSelector:
         Build initial display.
         :return:
         """
+
+        palette = self.frame.getpalette()
+        palette = np.reshape(palette,(len(palette)//3,3))
+
         # Convert PIL Image to pygame image.
         mode = self.frame.mode
         size = self.frame.size
         data = self.frame.tobytes()
         self.frame = pygame.image.fromstring(data, size, mode)
+        self.frame.set_palette(palette)
 
         # Get the whole frame, mostly for its dimensions.
         whole = self.frame.get_rect()
@@ -290,7 +294,7 @@ class MouseDetector:
             d_movie: stacked frames of the difference between frames and baseline.
             threshold: scalar [0,1].
         """
-        thresh_movie = [cv2.inRange(frame, threshold, 1) for frame in d_movie]
+        thresh_movie = [cv2.inRange(frame, threshold, 100) for frame in d_movie]
 
         return thresh_movie
 
@@ -302,7 +306,7 @@ class MouseDetector:
         params.filterByColor = False
         params.filterByConvexity = False
         params.filterByInertia = False
-        params.maxThreshold = 255
+        params.maxThreshold = 100
         params.maxArea = 100000
 
         detector = cv2.SimpleBlobDetector_create(params)
@@ -311,12 +315,12 @@ class MouseDetector:
 
     def detect_mouse(self, threshold):
         d_movie = self.make_difference_movie()                      # Make difference movie.
-        thresh_movie = self.threshold_movie(d_movie, threshold)     # Make thresholded movie.
+        #thresh_movie = self.threshold_movie(d_movie, threshold)     # Make thresholded movie.
         detector = self.build_blob_detector()                       # Build blob detector.
 
         # Detect blobs on each frame.
         position = np.zeros([self.n_frames, 2])
-        for i, frame in enumerate(thresh_movie):
+        for i, frame in enumerate(d_movie):
             blobs = detector.detect(frame)
 
             blob_sizes = [this_blob.size for this_blob in blobs]
@@ -339,8 +343,8 @@ class MouseDetector:
         return position
 
 
-# FF = FFObj(0)
+FF = FFObj(0)
 # FF.scroll_through_frames()
-# FF = FFObj(0)
 # FF.inquire_user_for_baseline_inputs()
 # FF.auto_detect_mouse()
+FF.process_video()
