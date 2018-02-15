@@ -28,8 +28,6 @@ class FFObj:
         if stitch:
             self.get_baseline_frame()
 
-        self.movie = color.rgb2gray(self.movie)
-
     def get_ff_files(self):
         """
         Find FreezeFrame files by searching the directory.
@@ -277,8 +275,9 @@ class MouseDetector:
         Take the difference between every frame and the baseline.
         """
         # Preallocate then for each frame, subtract it from the baseline.
-        d_movie = np.zeros(self.movie.shape)
+        d_movie = np.zeros(self.movie.shape[0:3])
         for i, frame in enumerate(self.movie):
+            frame = color.rgb2gray(frame)
             d_movie[i] = self.delta_baseline(frame)
 
         return d_movie
@@ -339,8 +338,8 @@ class MouseDetector:
         return position
 
 
-# FF = FFObj(0)
+#FF = FFObj(0)
 # FF.scroll_through_frames()
 # FF = FFObj(0)
 # FF.inquire_user_for_baseline_inputs()
-# FF.auto_detect_mouse()
+#FF.process_video()
