@@ -24,9 +24,14 @@ class FFObj:
         self.movie = skvideo.io.vread(self.avi_location)
         self.n_frames = len(self.movie)
         self.video_t = self.get_timestamps()
+        self.get_baseline_frame(stitch)
 
-        if stitch:
-            self.get_baseline_frame()
+    def disp_baseline(self):
+        """
+        Display the baseline frame.
+        """
+        plt.figure()
+        plt.imshow(self.baseline_frame, cmap='gray')
 
     def get_ff_files(self):
         """
@@ -100,7 +105,7 @@ class FFObj:
         paste_onto_me.paste(chunk, region)
         self.baseline_frame = color.rgb2gray(np.array(paste_onto_me))
 
-    def get_baseline_frame(self):
+    def get_baseline_frame(self,stitch):
         """
         Build the baseline frame.
         """
@@ -114,11 +119,16 @@ class FFObj:
 
         # When you hit ESC, prompt for frame numbers.
         else:
-            from_frame = int(input("From what frame do you want to cut out a region?"))
-            to_frame = int(input("On what frame do you want to paste that region?"))
+            if stitch:
+                from_frame = int(input("From what frame do you want to cut out a region?"))
+                to_frame = int(input("On what frame do you want to paste that region?"))
 
-        # Stitch the partial frames together.
-        self.stitch_baseline_frame(from_frame, to_frame)
+                # Stitch the partial frames together.
+                self.stitch_baseline_frame(from_frame, to_frame)
+
+            else:
+                frame = int(input("Define baseline frame:"))
+                self.baseline_frame = color.rgb2gray(self.movie[frame])
 
     def auto_detect_mouse(self, smooth_sigma=6, threshold=0.15):
         """
@@ -259,7 +269,7 @@ class MouseDetector:
         self.baseline = baseline_frame
         self.d_movie = self.make_difference_movie()
 
-    def delta_baseline(self, frame):
+    def make_delta_baseline(self, frame):
         """
         Find the difference of a frame from the baseline, then smooth.
         :param
@@ -278,7 +288,7 @@ class MouseDetector:
         d_movie = np.zeros(self.movie.shape[0:3])
         for i, frame in enumerate(self.movie):
             frame = color.rgb2gray(frame)
-            d_movie[i] = self.delta_baseline(frame)
+            d_movie[i] = self.make_delta_baseline(frame)
 
         return d_movie
 
