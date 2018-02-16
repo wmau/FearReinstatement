@@ -13,6 +13,7 @@ from session_directory import load_session_list
 import plot_functions as plot_funcs
 from scipy.ndimage.filters import gaussian_filter as gfilt
 import calcium_traces as ca_traces
+from helper_functions import find_closest
 
 session_list = load_session_list()
 
@@ -121,8 +122,8 @@ class FFObj:
         # When you hit ESC, prompt for frame numbers.
         else:
             if stitch:
-                from_frame = int(input("From what frame do you want to cut out a region?"))
-                to_frame = int(input("On what frame do you want to paste that region?"))
+                from_frame = int(input("From what frame do you want to cut out a region? "))
+                to_frame = int(input("On what frame do you want to paste that region? "))
 
                 # Stitch the partial frames together.
                 self.stitch_baseline_frame(from_frame, to_frame)
@@ -149,7 +150,16 @@ class FFObj:
         x = np.interp(imaging_t, self.video_t, self.position[:, 0])
         y = np.interp(imaging_t, self.video_t, self.position[:, 1])
 
-        return x,y,imaging_t
+        imaging_freezing = np.zeros(imaging_t.shape, dtype=bool)
+        freezing_epochs = self.get_freezing_epochs()
+
+        # Interpolate the freezing bouts.
+        for this_epoch in freezing_epochs:
+            _, start_idx = find_closest(imaging_t, self.video_t[this_epoch[0]])
+            _, end_idx = find_closest(imaging_t, self.video_t[this_epoch[1]-1])
+            imaging_freezing[start_idx:end_idx] = True
+
+        return x,y,imaging_t,imaging_freezing
 
     def detect_freezing(self,velocity_threshold, min_freeze_duration, plot_freezing):
         """
@@ -159,28 +169,34 @@ class FFObj:
             min_freeze_duration: also, the epoch needs to be longer than this scalar.
             plot_freezing: logical, whether you want to see the results.
         """
-        pos_diff = np.diff(self.position, axis=0)           # For calculating distance.
-        time_diff = np.diff(self.video_t)                   # Time difference.
-        distance = np.hypot(pos_diff[:,0], pos_diff[:,1])   # Displacement.
-        velocity = distance//time_diff                      # Velocity.
+        pos_diff = np.diff(self.position, axis=0)               # For calculating distance.
+        time_diff = np.diff(self.video_t)                       # Time difference.
+        distance = np.hypot(pos_diff[:,0], pos_diff[:,1])       # Displacement.
+        velocity = np.concatenate(([0], distance//time_diff))   # Velocity.
         self.freezing = velocity < velocity_threshold
 
-        padded_freezing = np.concatenate(([0], self.freezing, [0]))
-        status_changes = np.abs(np.diff(padded_freezing))
-
-        # Find where freezing begins and ends.
-        freezing_ranges = np.where(status_changes==1)[0].reshape(-1,2)
+        freezing_epochs = self.get_freezing_epochs()
 
         # Get duration of freezing in frames.
-        freezing_duration = np.diff(freezing_ranges)
+        freezing_duration = np.diff(freezing_epochs)
 
         # If any freezing epochs were less than ~3 seconds long, get rid of them.
-        for this_epoch in freezing_ranges:
+        for this_epoch in freezing_epochs:
             if np.diff(this_epoch) < min_freeze_duration:
                 self.freezing[this_epoch[0]:this_epoch[1]] = False
 
         if plot_freezing:
             self.plot_freezing()
+
+
+    def get_freezing_epochs(self):
+        padded_freezing = np.concatenate(([0], self.freezing, [0]))
+        status_changes = np.abs(np.diff(padded_freezing))
+
+        # Find where freezing begins and ends.
+        freezing_epochs = np.where(status_changes == 1)[0].reshape(-1, 2)
+
+        return freezing_epochs
 
 
     def plot_position(self):
@@ -190,6 +206,7 @@ class FFObj:
         f = ScrollPlot(plot_funcs.display_frame_and_position,
                         movie=self.movie, n_frames=self.n_frames, position=self.position,
                        titles=titles)
+
 
     def plot_freezing(self):
         # Plot frame and position of mouse. Blue dots indicate freezing epochs.
@@ -207,7 +224,7 @@ class FFObj:
         """
         self.auto_detect_mouse(smooth_sigma, mouse_threshold)
         self.detect_freezing(velocity_threshold, min_freeze_duration, plot_freezing)
-        self.x,self.y,self.imaging_t = self.interpolate()
+        self.x,self.y,self.imaging_t,self.imaging_freezing = self.interpolate()
 
 
 class FrameSelector:
@@ -392,8 +409,8 @@ class MouseDetector:
 
 
 
-#FF = FFObj(0)
+FF = FFObj(0)
 # FF.scroll_through_frames()
 # FF = FFObj(0)
-#FF.process_video()
+FF.process_video()
 #FF.detect_freezing()
