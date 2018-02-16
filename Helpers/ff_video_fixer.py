@@ -6,6 +6,7 @@ import pygame
 import skvideo.io
 from skimage import color
 from pandas import read_csv
+from pickle import dump
 from PIL import Image
 import numpy as np
 import cv2
@@ -22,10 +23,15 @@ class FFObj:
     def __init__(self, session_index, stitch=True):
         self.session_index = session_index
         self.csv_location, self.avi_location = self.get_ff_files()
+
+        directory, _ = path.split(self.avi_location)
+        self.location = path.join(directory, 'Position.pkl')
+
         self.movie = skvideo.io.vread(self.avi_location)
         self.n_frames = len(self.movie)
         self.video_t = self.get_timestamps()
         self.get_baseline_frame(stitch)
+
 
     def disp_baseline(self):
         """
@@ -169,11 +175,11 @@ class FFObj:
             min_freeze_duration: also, the epoch needs to be longer than this scalar.
             plot_freezing: logical, whether you want to see the results.
         """
-        pos_diff = np.diff(self.position, axis=0)               # For calculating distance.
-        time_diff = np.diff(self.video_t)                       # Time difference.
-        distance = np.hypot(pos_diff[:,0], pos_diff[:,1])       # Displacement.
-        velocity = np.concatenate(([0], distance//time_diff))   # Velocity.
-        self.freezing = velocity < velocity_threshold
+        pos_diff = np.diff(self.position, axis=0)                       # For calculating distance.
+        time_diff = np.diff(self.video_t)                               # Time difference.
+        distance = np.hypot(pos_diff[:,0], pos_diff[:,1])               # Displacement.
+        self.velocity = np.concatenate(([0], distance//time_diff))      # Velocity.
+        self.freezing = self.velocity < velocity_threshold
 
         freezing_epochs = self.get_freezing_epochs()
 
@@ -226,6 +232,9 @@ class FFObj:
         self.detect_freezing(velocity_threshold, min_freeze_duration, plot_freezing)
         self.x,self.y,self.imaging_t,self.imaging_freezing = self.interpolate()
 
+    def save_data(self):
+        with open(self.location,'wb') as output:
+            dump(self,output)
 
 class FrameSelector:
     """
@@ -409,8 +418,8 @@ class MouseDetector:
 
 
 
-FF = FFObj(0)
+#FF = FFObj(0)
 # FF.scroll_through_frames()
 # FF = FFObj(0)
-FF.process_video()
+#FF.process_video()
 #FF.detect_freezing()
