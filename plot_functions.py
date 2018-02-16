@@ -43,15 +43,28 @@ def display_frame(obj):
     """
 
     if obj.current_position == 0:
-        obj.current_position = round(obj.n_frames/2)
+        obj.current_position = round(obj.n_frames / 2)
 
-    obj.ax.imshow(obj.movie[obj.current_position],cmap='gray')
+    obj.ax.imshow(obj.movie[obj.current_position], cmap='gray')
     obj.last_position = obj.n_frames - 1
+
 
 def display_frame_and_position(obj):
     if obj.current_position == 0:
-        obj.current_position = round(obj.n_frames/2)
+        obj.current_position = round(obj.n_frames / 2)
 
-    obj.ax.imshow(obj.movie[obj.current_position],cmap='gray')
-    obj.ax.plot(obj.position[obj.current_position,0],obj.position[obj.current_position,1],'ro')
+    obj.ax.imshow(obj.movie[obj.current_position], cmap='gray')
+    obj.ax.plot(obj.position[obj.current_position, 0], obj.position[obj.current_position, 1], 'ro')
+    obj.last_position = obj.n_frames - 1
+
+
+def display_frame_and_freezing(obj):
+    if obj.current_position == 0:
+        obj.current_position = round(obj.n_frames / 2)
+
+    obj.ax.imshow(obj.movie[obj.current_position], cmap='gray')
+    if obj.freezing[obj.current_position]:
+        obj.ax.plot(obj.position[obj.current_position, 0], obj.position[obj.current_position, 1], 'bo')
+    else:
+        obj.ax.plot(obj.position[obj.current_position, 0], obj.position[obj.current_position, 1], 'ro')
     obj.last_position = obj.n_frames - 1

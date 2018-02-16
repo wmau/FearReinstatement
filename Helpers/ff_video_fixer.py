@@ -70,6 +70,7 @@ class FFObj:
         f = ScrollPlot(plot_funcs.display_frame,
                        movie=self.movie, n_frames=self.n_frames,
                        titles=titles)
+        # reader = cv2.VideoCapture(self.avi_location)
 
         return f
 
@@ -130,7 +131,7 @@ class FFObj:
                 frame = int(input("Define baseline frame:"))
                 self.baseline_frame = color.rgb2gray(self.movie[frame])
 
-    def auto_detect_mouse(self, smooth_sigma=6, threshold=0.15):
+    def auto_detect_mouse(self, smooth_sigma, threshold):
         """
         Find the mouse automatically using preset settings and blob detection.
         :param
@@ -150,11 +151,62 @@ class FFObj:
 
         return x,y,imaging_t
 
-    def process_video(self):
+    def detect_freezing(self,velocity_threshold, min_freeze_duration, plot_freezing):
+        """
+        Detect freezing epochs.
+        :param
+            velocity_threshold: anything below this threshold is considered freezing.
+            min_freeze_duration: also, the epoch needs to be longer than this scalar.
+            plot_freezing: logical, whether you want to see the results.
+        """
+        pos_diff = np.diff(self.position, axis=0)           # For calculating distance.
+        time_diff = np.diff(self.video_t)                   # Time difference.
+        distance = np.hypot(pos_diff[:,0], pos_diff[:,1])   # Displacement.
+        velocity = distance//time_diff                      # Velocity.
+        self.freezing = velocity < velocity_threshold
+
+        padded_freezing = np.concatenate(([0], self.freezing, [0]))
+        status_changes = np.abs(np.diff(padded_freezing))
+
+        # Find where freezing begins and ends.
+        freezing_ranges = np.where(status_changes==1)[0].reshape(-1,2)
+
+        # Get duration of freezing in frames.
+        freezing_duration = np.diff(freezing_ranges)
+
+        # If any freezing epochs were less than ~3 seconds long, get rid of them.
+        for this_epoch in freezing_ranges:
+            if np.diff(this_epoch) < min_freeze_duration:
+                self.freezing[this_epoch[0]:this_epoch[1]] = False
+
+        if plot_freezing:
+            self.plot_freezing()
+
+
+    def plot_position(self):
+        # Plot frame and position of mouse.
+        titles = ["Frame " + str(n) for n in range(self.n_frames)]
+
+        f = ScrollPlot(plot_funcs.display_frame_and_position,
+                        movie=self.movie, n_frames=self.n_frames, position=self.position,
+                       titles=titles)
+
+    def plot_freezing(self):
+        # Plot frame and position of mouse. Blue dots indicate freezing epochs.
+        titles = ["Frame " + str(n) for n in range(self.n_frames)]
+
+        f = ScrollPlot(plot_funcs.display_frame_and_freezing,
+                       movie=self.movie, n_frames=self.n_frames,
+                       position=self.position, freezing=self.freezing,
+                       titles=titles)
+
+    def process_video(self,smooth_sigma=6, mouse_threshold=0.15, velocity_threshold=15,
+                      min_freeze_duration=10, plot_freezing=True):
         """
         Main function for detecting mouse and correcting video.
         """
-        self.auto_detect_mouse()
+        self.auto_detect_mouse(smooth_sigma, mouse_threshold)
+        self.detect_freezing(velocity_threshold, min_freeze_duration, plot_freezing)
         self.x,self.y,self.imaging_t = self.interpolate()
 
 
@@ -170,9 +222,6 @@ class FrameSelector:
     def display_frame(self, topleft, prior):
         """
         Displays the frame and bounded rectangle.
-        :param topleft:
-        :param prior:
-        :return:
         """
         x, y = topleft
 
@@ -339,17 +388,12 @@ class MouseDetector:
             except:
                 position[i] = [0, 0]
 
-        # Plot frame and position of mouse.
-        titles = ["Frame " + str(n) for n in range(self.n_frames)]
-
-        f = ScrollPlot(plot_funcs.display_frame_and_position,
-                       movie=self.movie, n_frames=self.n_frames, position=position, titles=titles)
-
         return position
+
 
 
 #FF = FFObj(0)
 # FF.scroll_through_frames()
 # FF = FFObj(0)
-# FF.inquire_user_for_baseline_inputs()
 #FF.process_video()
+#FF.detect_freezing()
