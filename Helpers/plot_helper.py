@@ -23,14 +23,18 @@ class ScrollPlot:
     # Initialize the class. Gather the data and labels.
     def __init__(self, plot_func, xlabel = 'x', ylabel = 'y', titles = (["Title"] * 10000), **kwargs):
         self.plot_func = plot_func
-        [self.fig, self.ax] = plt.subplots()
         self.xlabel = xlabel
         self.ylabel = ylabel
         self.titles = titles
+        self.n_rows = 1
+        self.n_cols = 1
+        self.share_y = False
 
         # Dump all arguments into ScrollPlot.
         for key,value in kwargs.items():
             setattr(self,key,value)
+
+        self.fig, (self.ax) = plt.subplots(self.n_rows, self.n_cols, sharey=self.share_y)
 
         # Necessary for scrolling.
         self.current_position = 0
@@ -59,7 +63,11 @@ class ScrollPlot:
     # Update the plot based on keyboard inputs.
     def update_plots(self, event):
         # Clear axis.
-        self.ax.cla()
+        try:
+            for ax in self.ax:
+                ax.cla()
+        except:
+            self.ax.cla()
 
         # Scroll then update plot.
         self.scroll(event)

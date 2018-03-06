@@ -103,4 +103,4 @@ class CellData:
         with open(self.cell_data_file, 'wb') as output:
             dump(self, output)
 
-CellData(0)
+# CellData(0)
