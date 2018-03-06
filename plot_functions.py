@@ -1,7 +1,7 @@
 """
 List of plotting functions to pass through ScrollPlot
 """
-
+from matplotlib import pyplot as plt
 
 def plot_traces(obj):
     """
@@ -68,3 +68,16 @@ def display_frame_and_freezing(obj):
     else:
         obj.ax.plot(obj.position[obj.current_position, 0], obj.position[obj.current_position, 1], 'ro')
     obj.last_position = obj.n_frames - 1
+
+def plot_freezing_traces(obj):
+    for i,this_epoch in enumerate(obj.epochs):
+        obj.ax[i].plot(obj.t[this_epoch[0]:this_epoch[1]],
+                       obj.traces[obj.current_position, this_epoch[0]:this_epoch[1]])
+
+    obj.last_position = len(obj.traces) - 1
+
+def heatmap(obj):
+    obj.ax.imshow(obj.heatmap[obj.current_position])
+    plt.axis('tight')
+
+    obj.last_position = len(obj.heatmap) - 1
