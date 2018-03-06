@@ -6,7 +6,7 @@ import pygame
 import skvideo.io
 from skimage import color
 from pandas import read_csv
-from pickle import dump
+from pickle import dump, load
 from PIL import Image
 import numpy as np
 import cv2
@@ -18,6 +18,14 @@ from helper_functions import find_closest
 
 session_list = load_session_list()
 
+def load_session(session_index):
+    directory = session_list[session_index]["Location"]
+    position_path = path.join(directory, 'FreezeFrame', 'Position.pkl')
+
+    with open(position_path, 'rb') as file:
+        FF = load(file)
+
+    return FF
 
 class FFObj:
     def __init__(self, session_index, stitch=True):
@@ -31,7 +39,6 @@ class FFObj:
         self.n_frames = len(self.movie)
         self.video_t = self.get_timestamps()
         self.get_baseline_frame(stitch)
-
 
     def disp_baseline(self):
         """
@@ -194,7 +201,6 @@ class FFObj:
         if plot_freezing:
             self.plot_freezing()
 
-
     def get_freezing_epochs(self):
         padded_freezing = np.concatenate(([0], self.freezing, [0]))
         status_changes = np.abs(np.diff(padded_freezing))
@@ -202,17 +208,33 @@ class FFObj:
         # Find where freezing begins and ends.
         freezing_epochs = np.where(status_changes == 1)[0].reshape(-1, 2)
 
+        freezing_epochs[freezing_epochs >= self.video_t.shape[0]] = self.video_t.shape[0] - 1
+
+        # Only take the middle.
+        freezing_epochs = freezing_epochs[1:-1]
+
         return freezing_epochs
 
+    def get_freezing_epochs_imaging_framerate(self):
+        # Get freezing epochs in video time.
+        epochs = self.get_freezing_epochs()
+
+        # Get the imaging indices for freezing.
+        freeze_epochs = np.zeros(epochs.shape, dtype=int)
+        for i,this_epoch in enumerate(epochs):
+            _,start = find_closest(self.imaging_t,self.video_t[this_epoch[0]])
+            _,end = find_closest(self.imaging_t,self.video_t[this_epoch[1]])
+            freeze_epochs[i,:] = [start, end]
+
+        return freeze_epochs
 
     def plot_position(self):
         # Plot frame and position of mouse.
         titles = ["Frame " + str(n) for n in range(self.n_frames)]
 
         f = ScrollPlot(plot_funcs.display_frame_and_position,
-                        movie=self.movie, n_frames=self.n_frames, position=self.position,
+                       movie=self.movie, n_frames=self.n_frames, position=self.position,
                        titles=titles)
-
 
     def plot_freezing(self):
         # Plot frame and position of mouse. Blue dots indicate freezing epochs.
@@ -417,8 +439,8 @@ class MouseDetector:
         return position
 
 
-
-#FF = FFObj(0)
+# Debugging purposes.
+# FF = FFObj(0)
 # FF.scroll_through_frames()
 # FF = FFObj(0)
 #FF.process_video()
