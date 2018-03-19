@@ -79,14 +79,36 @@ class FFObj:
         Scroll through all the frames of the movie. Currently the default starting point
         is the middle.
         """
-        titles = ["Frame " + str(n) for n in range(self.n_frames)]
+        # titles = ["Frame " + str(n) for n in range(self.n_frames)]
+        #
+        # f = ScrollPlot(plot_funcs.display_frame,
+        #                movie=self.movie, n_frames=self.n_frames,
+        #                titles=titles)
+        reader = cv2.VideoCapture(self.avi_location)
 
-        f = ScrollPlot(plot_funcs.display_frame,
-                       movie=self.movie, n_frames=self.n_frames,
-                       titles=titles)
-        # reader = cv2.VideoCapture(self.avi_location)
+        def onChange(track_bar_value):
+            reader.set(cv2.CAP_PROP_POS_FRAMES,track_bar_value)
+            err,img = reader.read()
+            cv2.imshow('Video',img)
+            pass
 
-        return f
+        cv2.namedWindow('Video')
+        cv2.createTrackbar('Frame 1','Video',0,self.n_frames,onChange)
+        cv2.createTrackbar('Frame 2','Video',0,self.n_frames,onChange)
+
+        onChange(0)
+        keep_going = True
+        while keep_going:
+            k = cv2.waitKey()
+            if k==27:
+                keep_going = False
+
+        frame1 = cv2.getTrackbarPos('Frame 1','Video')
+        frame2 = cv2.getTrackbarPos('Frame 2','Video')
+
+        cv2.destroyAllWindows()
+
+        return frame1, frame2
 
     def select_region(self, frame_num):
         """
@@ -125,25 +147,14 @@ class FFObj:
         Build the baseline frame.
         """
         # Scroll through the frames.
-        f = self.scroll_through_frames()
-        fig_num = f.fig.number
+        if stitch:
+            from_frame,to_frame = self.scroll_through_frames()
 
-        # While the figure is still open, keep going.
-        while plt.fignum_exists(fig_num):
-            plt.waitforbuttonpress(0)
+            self.stitch_baseline_frame(from_frame, to_frame)
 
-        # When you hit ESC, prompt for frame numbers.
         else:
-            if stitch:
-                from_frame = int(input("From what frame do you want to cut out a region? "))
-                to_frame = int(input("On what frame do you want to paste that region? "))
-
-                # Stitch the partial frames together.
-                self.stitch_baseline_frame(from_frame, to_frame)
-
-            else:
-                frame = int(input("Define baseline frame:"))
-                self.baseline_frame = color.rgb2gray(self.movie[frame])
+            frame,_ = self.scroll_through_frames()
+            self.baseline_frame = color.rgb2gray(self.movie[frame])
 
     def auto_detect_mouse(self, smooth_sigma, threshold):
         """
@@ -228,6 +239,18 @@ class FFObj:
 
         return freeze_epochs
 
+    def get_mouse_in_cage_epoch(self):
+        # Get epoch (as a frame # of the tracking video) where mouse is in
+        # the fear conditioning chamber.
+        self.mouse_in_cage_imaging_t = np.zeros(2)
+        frame1,frame2 = self.scroll_through_frames()
+
+        # Get timestamps.
+        self.mouse_in_cage_imaging_t[0],start = find_closest(self.imaging_t,self.video_t[frame1])
+        self.mouse_in_cage_imaging_t[1],end = find_closest(self.imaging_t,self.video_t[frame2])
+        self.mouse_in_cage = np.zeros(self.imaging_t.shape,dtype=bool)
+        self.mouse_in_cage[start:end] = True
+
     def plot_position(self):
         # Plot frame and position of mouse.
         titles = ["Frame " + str(n) for n in range(self.n_frames)]
@@ -253,6 +276,7 @@ class FFObj:
         self.auto_detect_mouse(smooth_sigma, mouse_threshold)
         self.detect_freezing(velocity_threshold, min_freeze_duration, plot_freezing)
         self.x,self.y,self.imaging_t,self.imaging_freezing = self.interpolate()
+        self.get_mouse_in_cage_epoch()
 
     def save_data(self):
         with open(self.location,'wb') as output:
@@ -440,8 +464,8 @@ class MouseDetector:
 
 
 # Debugging purposes.
-# FF = FFObj(0)
-# FF.scroll_through_frames()
+#FF = FFObj(0)
+#FF.process_video()
 # FF = FFObj(0)
 #FF.process_video()
 #FF.detect_freezing()
