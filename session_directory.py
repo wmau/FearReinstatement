@@ -15,3 +15,20 @@ def load_session_list():
     session_list = load(open(file, 'rb'))
 
     return session_list
+
+def check_session(session_index):
+    """
+    Displays all the details of that session as recorded in the CSV file.
+
+    :param
+        session_index: number corresponding to a session.
+    :return
+        Printed session information.
+    """
+    session_list = load_session_list()
+
+    print("Mouse: " + session_list[session_index]["Animal"])
+    print("Date: " + session_list[session_index]["Date"])
+    print("Session # that day: " + session_list[session_index]["Session"])
+    print("Location: " + session_list[session_index]["Location"])
+    print("Notes: " + session_list[session_index]["Notes"])
