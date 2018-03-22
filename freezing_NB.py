@@ -18,7 +18,7 @@ from random import randint
 
 session_list = load_session_list()
 
-def NB_session(session_index, bin_length=2, randomize=False):
+def preprocess_NB(session_index, bin_length=2):
     session = FF.load_session(session_index)
 
     # Get accepted neurons.
@@ -32,10 +32,6 @@ def NB_session(session_index, bin_length=2, randomize=False):
     traces = d_pp.trim_session(traces,session.mouse_in_cage)
     n_samples = len(t)
 
-    if randomize:
-        for n,trace in enumerate(traces):
-            traces[n,:] = np.roll(trace,randint(-n_samples,n_samples))
-
     samples_per_bin = bin_length * 20
     bins = d_pp.make_bins(t,samples_per_bin)
     n_samples = len(bins)+1
@@ -47,10 +43,13 @@ def NB_session(session_index, bin_length=2, randomize=False):
 
 
     binned_freezing = d_pp.bin_time_series(session.imaging_freezing, bins)
-    binned_freezing = [i.all() for i in binned_freezing]
+    Y = [i.all() for i in binned_freezing]
 
+    return X, Y
+
+def NB_session(X,Y):
     # Build train and test sets.
-    X_train, X_test, y_train, y_test = train_test_split(X, binned_freezing,
+    X_train, X_test, y_train, y_test = train_test_split(X, Y,
                                                         test_size=0.2)
     classifier = make_pipeline(StandardScaler(), GaussianNB())
     classifier.fit(X_train, y_train)
@@ -60,6 +59,14 @@ def NB_session(session_index, bin_length=2, randomize=False):
 
     return accuracy
 
+def NB_session_permutation(X,Y):
+    classifier = make_pipeline(StandardScaler(), PCA(n_components=3), GaussianNB())
+    cv = StratifiedKFold(2)
+
+    score, permutation_scores, p_value = permutation_test_score(classifier, X, Y, scoring='accuracy',
+                                                                cv=cv, n_permutations=50, n_jobs=1)
+
+    return score, permutation_scores, p_value
 
     # lda = LinearDiscriminantAnalysis(solver='eigen',n_components=2,shrinkage='auto')
     # lda.fit(X,binned_freezing)
@@ -67,11 +74,7 @@ def NB_session(session_index, bin_length=2, randomize=False):
 
 
 if __name__ == '__main__':
-    n = 1
-    accuracy = NB_session(n)
-    shuffle_accuracy = []
-    for i in np.arange(0,100):
-        x = NB_session(n,randomize=True)
-        shuffle_accuracy.append(x)
+    X,Y = preprocess_NB(1)
+    score, permutation_scores, p_value = NB_session_permutation(X,Y)
 
     pass
