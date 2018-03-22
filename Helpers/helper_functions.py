@@ -5,10 +5,6 @@ def find_closest(array, value):
 
     return array[idx],idx
 
-def filter_good_neurons(accepted):
-    neurons = [cell_number for cell_number, good in enumerate(accepted) if good]
-
-    return neurons
 
 def ismember(A,B):
     """
