@@ -23,6 +23,8 @@ def rename_rejected_ROIs(session_index):
     _, accepted, _ = ca_traces.load_traces(session_index)
 
     tiffs = glob.glob(path.join(directory, 'ROIs_????.*'))
+    if not tiffs:
+        tiffs = glob.glob(path.join(directory, 'ROIs_???.*'))
 
     # Rename the file so formatFootprints2.m doesn't regiser it.
     for cell, good in enumerate(accepted):
@@ -110,4 +112,4 @@ class CellRegObj:
 
 
 if __name__ == '__main__':
-    CellRegObj('Kerberos')
+    exclude_bad_cells_in_this_mouse('Atlas')
