@@ -23,6 +23,7 @@ def preprocess_NB(session_index, bin_length=2):
 
     # Get accepted neurons.
     traces, accepted, t = ca_traces.load_traces(session_index)
+    traces = zscore(traces,axis=0)
     # traces = ca_events.make_event_matrix(session_index)
     neurons = d_pp.filter_good_neurons(accepted)
     n_neurons = len(neurons)
@@ -60,7 +61,7 @@ def NB_session(X,Y):
     return accuracy
 
 def NB_session_permutation(X,Y):
-    classifier = make_pipeline(StandardScaler(), PCA(n_components=3), GaussianNB())
+    classifier = make_pipeline(StandardScaler(), GaussianNB())
     cv = StratifiedKFold(2)
 
     score, permutation_scores, p_value = permutation_test_score(classifier, X, Y, scoring='accuracy',
@@ -74,7 +75,7 @@ def NB_session_permutation(X,Y):
 
 
 if __name__ == '__main__':
-    X,Y = preprocess_NB(1)
+    X,Y = preprocess_NB(12)
     score, permutation_scores, p_value = NB_session_permutation(X,Y)
 
     pass
