@@ -17,6 +17,7 @@ class ShockObj:
         traces, self.accepted, self.t = \
             ca_traces.load_traces(session_index)
         self.traces = zscore(traces, axis=0)
+        self.align_neurons()
 
     def align_trace(self, window, trace):
         n_back = window[0]
@@ -31,7 +32,7 @@ class ShockObj:
 
         return aligned_trace
 
-    def align_neurons(self, window, neurons='all'):
+    def align_neurons(self, window=[-1,20]):
         window.sort()
         self.window = np.asarray(window)
 
@@ -39,44 +40,33 @@ class ShockObj:
         assert any(self.window < 0), "One input must be negative."
         assert any(self.window > 0), "One input must be positive."
 
-        if neurons == 'all':
-            self.neurons = d_pp.filter_good_neurons(self.accepted)
-
         window = self.frame_rate * self.window
         self.aligned_traces = []
-        for this_neuron in self.neurons:
-            trace = self.align_trace(window, self.traces[this_neuron])
+        for this_trace in self.traces:
+            trace = self.align_trace(window, this_trace)
 
             self.aligned_traces.append(trace)
 
-    def plot_traces(self, window=[-1,20]):
-        try:
-            titles = neuron_number_title(self.neurons)
-            ref_time = np.arange(self.window[0], self.window[1],
-                                 1 / self.frame_rate)
-            f = ScrollPlot(plot_funcs.plot_multiple_traces,
-                           t=ref_time, traces=self.aligned_traces,
-                           xlabel='Time from shock (s)',
-                           ylabel='Calcium activity (s.d.)',
-                           titles=titles)
-        except:
-            self.align_neurons(window)
+    def plot_traces(self, neurons='all'):
+        if neurons == 'all':
+            neurons = d_pp.filter_good_neurons(self.accepted)
 
-            titles = neuron_number_title(self.neurons)
-            ref_time = np.arange(self.window[0], self.window[1],
-                                 1 / self.frame_rate)
-            f = ScrollPlot(plot_funcs.plot_multiple_traces,
-                           t=ref_time, traces=self.aligned_traces,
-                           xlabel='Time from shock (s)',
-                           ylabel='Calcium activity (s.d.)',
-                           titles=titles)
+        selected_traces = [self.aligned_traces[n] for n in neurons]
 
-            pass
+        titles = neuron_number_title(neurons)
+        ref_time = np.arange(self.window[0], self.window[1],
+                                 1 / self.frame_rate)
+        f = ScrollPlot(plot_funcs.plot_multiple_traces,
+                       t=ref_time,
+                       traces=selected_traces,
+                       xlabel='Time from shock (s)',
+                       ylabel='Calcium activity (s.d.)',
+                       titles=titles)
+
+
         return f
 
 
 if __name__ == '__main__':
     S = ShockObj(0)
     S.plot_traces()
-
-    pass
