@@ -1,7 +1,8 @@
 """
 List of plotting functions to pass through ScrollPlot
 """
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 def plot_traces(obj):
     """
@@ -9,7 +10,7 @@ def plot_traces(obj):
     :param
         obj: ScrollPlot class object.
     """
-    obj.ax.plot(obj.t, obj.traces[obj.current_position, :])
+    obj.ax.plot(obj.t, obj.traces[obj.current_position])
     obj.last_position = len(obj.traces) - 1
 
 
@@ -81,3 +82,10 @@ def heatmap(obj):
     plt.axis('tight')
 
     obj.last_position = len(obj.heatmap) - 1
+
+def plot_multiple_traces(obj):
+    for i,trace in enumerate(obj.traces[obj.current_position]):
+        c = cm.gray(i/len(obj.traces[obj.current_position]),1)
+        obj.ax.plot(obj.t,trace,color=c)
+
+    obj.last_position = len(obj.traces) - 1
