@@ -73,7 +73,7 @@ def plot_freezing_traces(session_index):
                    share_y=True,  xlabel='Time (s)', ylabel='%DF/F')
 
 def freezing_trace_heatmap(session_index, neurons='all'):
-    if neurons is 'all':
+    if neurons == 'all':
         n_neurons = cell_stats.get_number_of_ICs(session_index)
         neurons = np.arange(n_neurons)
     else:
