@@ -1,5 +1,5 @@
 from os import path, rename
-from session_directory import load_session_list
+from session_directory import load_session_list, find_mouse_directory
 import calcium_traces as ca_traces
 import glob
 import h5py
@@ -23,6 +23,7 @@ def rename_rejected_ROIs(session_index):
     _, accepted, _ = ca_traces.load_traces(session_index)
 
     tiffs = glob.glob(path.join(directory, 'ROIs_????.*'))
+    # Handles BLA sessions.
     if not tiffs:
         tiffs = glob.glob(path.join(directory, 'ROIs_???.*'))
 
@@ -45,6 +46,15 @@ def exclude_bad_cells_in_this_mouse(mouse):
         if entry["Animal"] == mouse:
             rename_rejected_ROIs(session_index)
 
+def load_cellreg_results(mouse):
+        mouse_directory = find_mouse_directory(mouse)
+        cellreg_directory = path.join(mouse_directory,'CellRegResults')
+        cellreg_file = path.join(cellreg_directory,'CellRegResults.pkl')
+        with open(cellreg_file, 'rb') as file:
+            match_map, centroids, footprints = pickle.load(file)
+
+        return match_map, centroids, footprints
+
 class CellRegObj:
     def __init__(self,mouse):
         self.mouse = mouse
@@ -52,16 +62,7 @@ class CellRegObj:
         self.compile_cellreg_data()
 
     def read_cellreg_output(self):
-
-        # Seems really inefficient but functional for now. Searches the directory containing that
-        # mouse's data folders.
-        mouse_not_found = True
-        while mouse_not_found:
-            for session in session_list:
-                if session["Animal"] == self.mouse:
-                    mouse_directory = path.split(session["Location"])[0]
-                    mouse_not_found = False
-                    break
+        mouse_directory = find_mouse_directory(self.mouse)
 
         # Get the .mat file name.
         self.cellreg_results_directory = path.join(mouse_directory, 'CellRegResults')
@@ -112,4 +113,4 @@ class CellRegObj:
 
 
 if __name__ == '__main__':
-    exclude_bad_cells_in_this_mouse('Atlas')
+    load_cellreg_results('Kerberos')
