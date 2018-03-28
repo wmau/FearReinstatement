@@ -22,6 +22,6 @@ def make_bins(data,samples_per_bin):
     return bins
 
 def bin_time_series(data,bins):
-    binned_data = np.split(data,bins)
+    binned_data = np.split(data, bins)
 
     return binned_data

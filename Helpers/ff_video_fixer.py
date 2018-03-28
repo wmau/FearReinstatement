@@ -481,6 +481,6 @@ class MouseDetector:
 
 
 if __name__ == '__main__':
-    FF = FFObj(11)
+    FF = FFObj(1)
     FF.process_video()
     pass
