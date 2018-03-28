@@ -1,21 +1,14 @@
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.naive_bayes import GaussianNB
-from sklearn.svm import SVC
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn import metrics
-from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import train_test_split, StratifiedKFold, permutation_test_score
-from session_directory import load_session_list
 import calcium_traces as ca_traces
-import numpy as np
-from matplotlib import pyplot as plt
-import ff_video_fixer as ff
-from mpl_toolkits.mplot3d import Axes3D
 import data_preprocessing as d_pp
-import calcium_events as ca_events
+import ff_video_fixer as ff
+import numpy as np
 from scipy.stats import zscore
-from random import randint
+from session_directory import load_session_list
+from sklearn import metrics
+from sklearn.model_selection import train_test_split, StratifiedKFold, permutation_test_score
+from sklearn.naive_bayes import GaussianNB
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 session_list = load_session_list()
 
@@ -33,7 +26,8 @@ def preprocess_NB(session_index, bin_length=2):
     # Trim the traces to only include instances where mouse is in the chamber.
     t = d_pp.trim_session(t, session.mouse_in_cage)
     traces = d_pp.trim_session(traces, session.mouse_in_cage)
-    freezing = d_pp.trim_session(session.imaging_freezing,session.mouse_in_cage)
+    freezing = d_pp.trim_session(session.imaging_freezing,
+                                 session.mouse_in_cage)
 
     samples_per_bin = bin_length * 20
     bins = d_pp.make_bins(t, samples_per_bin)
@@ -79,8 +73,8 @@ def NB_session_permutation(X, Y):
 
 
 if __name__ == '__main__':
-    X, Y = preprocess_NB(1)
+    X, Y = preprocess_NB(0)
     score, permutation_scores, p_value = NB_session_permutation(X, Y)
+    accuracy = NB_session(X, Y)
 
-    NB_session(X, Y)
     pass
