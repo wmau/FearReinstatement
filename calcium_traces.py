@@ -34,7 +34,7 @@ def load_traces(session_index):
     # Gather data.
     data = CellData(session_index)
 
-    return data.traces, data.accepted, data.t.astype(np.float)
+    return data.traces.astype(np.float), data.accepted, data.t.astype(np.float)
 
 def plot_traces(session_index, neurons):
     """

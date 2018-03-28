@@ -18,7 +18,7 @@ def PCA_session(session_index, bin_length=2):
 
     # Get accepted neurons.
     traces, accepted, t = ca_traces.load_traces(session_index)
-    traces = zscore(traces,axis=0)
+    traces = zscore(traces, axis=0)
     # traces = ca_events.make_event_matrix(session_index)       # If you want events (not traces).
     scaler = StandardScaler()
     traces = scaler.fit_transform(traces)
@@ -59,4 +59,4 @@ def PCA_session(session_index, bin_length=2):
     pass
 
 if __name__ == '__main__':
-    PCA_session(12)
+    PCA_session(11)

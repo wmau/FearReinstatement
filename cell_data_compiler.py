@@ -83,8 +83,8 @@ class CellData:
             # Gather calcium events.
             for row in events_csv:
                 ind = int(row[" Cell Name"][2:])
-                self.event_times[ind].append(float(row["Time (s)"]))
-                self.event_values[ind].append(float(row[" Value"]))
+                self.event_times[ind].append(row["Time (s)"])
+                self.event_values[ind].append(row[" Value"])
 
         # Turn a list of lists into an array of lists. This will make indexing easier.
         self.event_times = array(self.event_times)
@@ -103,4 +103,6 @@ class CellData:
         with open(self.cell_data_file, 'wb') as output:
             dump(self, output)
 
-# CellData(0)
+
+if __name__ == '__main__':
+    CellData(11)
