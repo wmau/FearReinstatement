@@ -33,6 +33,7 @@ def preprocess_NB(session_index, bin_length=2):
     # Trim the traces to only include instances where mouse is in the chamber.
     t = d_pp.trim_session(t, session.mouse_in_cage)
     traces = d_pp.trim_session(traces, session.mouse_in_cage)
+    freezing = d_pp.trim_session(session.imaging_freezing,session.mouse_in_cage)
 
     samples_per_bin = bin_length * 20
     bins = d_pp.make_bins(t, samples_per_bin)
@@ -43,7 +44,7 @@ def preprocess_NB(session_index, bin_length=2):
         binned_activity = d_pp.bin_time_series(traces[this_neuron], bins)
         X[:, n] = [np.mean(chunk) for chunk in binned_activity]
 
-    binned_freezing = d_pp.bin_time_series(session.imaging_freezing, bins)
+    binned_freezing = d_pp.bin_time_series(freezing, bins)
     Y = [i.all() for i in binned_freezing]
 
     return X, Y
@@ -68,7 +69,7 @@ def NB_session_permutation(X, Y):
 
     score, permutation_scores, p_value = \
         permutation_test_score(classifier, X, Y, scoring='accuracy',
-                               cv=cv, n_permutations=50, n_jobs=1)
+                               cv=cv, n_permutations=500, n_jobs=1)
 
     return score, permutation_scores, p_value
 

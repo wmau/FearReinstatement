@@ -13,13 +13,13 @@ from scipy.stats import zscore
 
 session_list = load_session_list()
 
-def PCA_session(session_index, bin_length=2):
+def PCA_session(session_index, bin_length=1):
     session = FF.load_session(session_index)
 
     # Get accepted neurons.
     traces, accepted, t = ca_traces.load_traces(session_index)
     traces = zscore(traces, axis=0)
-    # traces = ca_events.make_event_matrix(session_index)       # If you want events (not traces).
+    #traces = ca_events.make_event_matrix(session_index)       # If you want events (not traces).
     scaler = StandardScaler()
     traces = scaler.fit_transform(traces)
     neurons = d_pp.filter_good_neurons(accepted)
@@ -28,6 +28,7 @@ def PCA_session(session_index, bin_length=2):
     # Trim the traces to only include instances where mouse is in the chamber.
     t = d_pp.trim_session(t,session.mouse_in_cage)
     traces = d_pp.trim_session(traces,session.mouse_in_cage)
+    freezing = d_pp.trim_session(session.imaging_freezing,session.mouse_in_cage)
 
     samples_per_bin = bin_length * 20
     bins = d_pp.make_bins(t,samples_per_bin)
@@ -40,8 +41,8 @@ def PCA_session(session_index, bin_length=2):
 
         X[:,n] = avg_activity
 
-    binned_freezing = d_pp.bin_time_series(session.imaging_freezing, bins)
-    binned_freezing = [i.all() for i in binned_freezing]
+    binned_freezing = d_pp.bin_time_series(freezing, bins)
+    binned_freezing = [i.any() for i in binned_freezing]
 
     # lda = LinearDiscriminantAnalysis(solver='eigen',n_components=2,shrinkage='auto')
     # lda.fit(X,binned_freezing)
@@ -59,4 +60,4 @@ def PCA_session(session_index, bin_length=2):
     pass
 
 if __name__ == '__main__':
-    PCA_session(11)
+    PCA_session(4)
