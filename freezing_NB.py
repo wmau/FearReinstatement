@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold, permutati
 from sklearn.naive_bayes import GaussianNB
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from cell_reg import load_cellreg_results
 
 session_list = load_session_list()
 
@@ -29,15 +30,18 @@ def preprocess_NB(session_index, bin_length=2):
     freezing = d_pp.trim_session(session.imaging_freezing,
                                  session.mouse_in_cage)
 
+    # Define bin limits.
     samples_per_bin = bin_length * 20
     bins = d_pp.make_bins(t, samples_per_bin)
     n_samples = len(bins) + 1
 
+    # Bin the imaging data.
     X = np.zeros([n_samples, n_neurons])
     for n, this_neuron in enumerate(neurons):
         binned_activity = d_pp.bin_time_series(traces[this_neuron], bins)
         X[:, n] = [np.mean(chunk) for chunk in binned_activity]
 
+    # Bin freezing vector.
     binned_freezing = d_pp.bin_time_series(freezing, bins)
     Y = [i.all() for i in binned_freezing]
 
@@ -52,15 +56,18 @@ def NB_session(X, Y):
     classifier.fit(X_train, y_train)
     predict_test = classifier.predict(X_test)
 
+    # Classify.
     accuracy = metrics.accuracy_score(y_test, predict_test)
 
     return accuracy
 
 
 def NB_session_permutation(X, Y):
+    # Build classifier and cross-validation object.
     classifier = make_pipeline(StandardScaler(), GaussianNB())
     cv = StratifiedKFold(2)
 
+    # Classify and permutation tests.
     score, permutation_scores, p_value = \
         permutation_test_score(classifier, X, Y, scoring='accuracy',
                                cv=cv, n_permutations=500, n_jobs=1)
@@ -71,10 +78,25 @@ def NB_session_permutation(X, Y):
     # lda.fit(X,binned_freezing)
     # Y = lda.transform(X)
 
+def preprocess_NB_cross_session(session_1, session_2, bin_length=2):
+    # Make sure the data comes from the same mouse.
+    mouse = session_list[session_1]["Animal"]
+    assert mouse == session_list[session_2]["Animal"], \
+        "Mouse names don't match!"
+
+    # Trim and bin data from both sessions.
+    test_X, test_Y = preprocess_NB(session_1, bin_length=bin_length)
+    train_X, train_Y = preprocess_NB(session_2, bin_length=bin_length)
+
+    # Get registration map.
+    match_map, _, _ = load_cellreg_results(mouse)
+
+    pass
 
 if __name__ == '__main__':
-    X, Y = preprocess_NB(0)
-    score, permutation_scores, p_value = NB_session_permutation(X, Y)
-    accuracy = NB_session(X, Y)
+    #X, Y = preprocess_NB(0)
+    #score, permutation_scores, p_value = NB_session_permutation(X, Y)
+    #accuracy = NB_session(X, Y)
 
+    preprocess_NB_cross_session(0,1)
     pass

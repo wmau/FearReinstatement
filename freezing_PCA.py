@@ -13,7 +13,7 @@ from scipy.stats import zscore
 
 session_list = load_session_list()
 
-def PCA_session(session_index, bin_length=4):
+def PCA_session(session_index, bin_length=2):
     session = FF.load_session(session_index)
 
     # Get accepted neurons.
@@ -57,6 +57,7 @@ def PCA_session(session_index, bin_length=4):
     s = ax.scatter(Y[:,0], Y[:,1], Y[:,2], c=binned_freezing)
     fig.show()
 
+    pass
 
 if __name__ == '__main__':
-    PCA_session(0)
+    PCA_session(14)
