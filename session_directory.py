@@ -9,6 +9,7 @@ from os import path, chdir
 from pickle import load
 from csv import DictReader
 from pickle import dump
+from helper_functions import find_dict_index
 
 master_directory = 'U:\Fear conditioning project_Mosaic2\SessionDirectories'
 
@@ -80,3 +81,17 @@ def find_mouse_directory(mouse):
                 break
 
     return mouse_directory
+
+def find_mouse_sessions(mouse):
+    session_list = load_session_list()
+
+    filtered = filter(lambda sessions: sessions["Animal"]==mouse,
+                     session_list)
+    sessions = list(filtered)
+
+    idx = find_dict_index(session_list, "Animal", mouse)
+
+    return idx, sessions
+
+if __name__ == '__main__':
+    find_mouse_sessions("Kerberos")
