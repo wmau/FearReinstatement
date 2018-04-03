@@ -61,7 +61,7 @@ class CellData:
         Compile calcium traces.
         """
         with open(self.trace_file, 'r') as csv_file:
-            self.traces = read_csv(csv_file, skiprows=2).T.as_matrix()  # Need to transpose here.
+            self.traces = read_csv(csv_file, skiprows=1).T.as_matrix()  # Need to transpose here.
 
     def compile_time(self):
         """
@@ -105,4 +105,4 @@ class CellData:
 
 
 if __name__ == '__main__':
-    CellData(11)
+    CellData(0)

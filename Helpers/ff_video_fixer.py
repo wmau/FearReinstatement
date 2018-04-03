@@ -151,7 +151,7 @@ class FFObj:
         # Scroll through the frames.
         if stitch:
             print('Define the frames to stitch. Your crop from the top'
-                 'frame goes onto the bottom frame.')
+                 ' frame goes onto the bottom frame.')
             from_frame,to_frame = self.scroll_through_frames()
 
             self.stitch_baseline_frame(from_frame, to_frame)
@@ -257,7 +257,7 @@ class FFObj:
         # Get epoch (as a frame # of the tracking video) where mouse is in
         # the fear conditioning chamber.
         print('Define frames where mouse enters the chamber (top) or '
-              'extis the chamber (bottom).')
+              'exits the chamber (bottom).')
         self.mouse_in_cage_imaging_t = np.zeros(2)
         frame1,frame2 = self.scroll_through_frames()
 
