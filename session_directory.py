@@ -13,6 +13,7 @@ from helper_functions import find_dict_index
 
 master_directory = 'U:\Fear conditioning project_Mosaic2\SessionDirectories'
 
+
 def make_session_list(csv_directory):
     """
 
@@ -44,11 +45,13 @@ def make_session_list(csv_directory):
 
     return session_directories
 
+
 def load_session_list():
     file = path.join(master_directory, 'SessionDirectories.pkl')
     session_list = load(open(file, 'rb'))
 
     return session_list
+
 
 def check_session(session_index):
     """
@@ -67,6 +70,7 @@ def check_session(session_index):
     print("Location: " + session_list[session_index]["Location"])
     print("Notes: " + session_list[session_index]["Notes"])
 
+
 def find_mouse_directory(mouse):
     session_list = load_session_list()
 
@@ -82,16 +86,18 @@ def find_mouse_directory(mouse):
 
     return mouse_directory
 
+
 def find_mouse_sessions(mouse):
     session_list = load_session_list()
 
-    filtered = filter(lambda sessions: sessions["Animal"]==mouse,
-                     session_list)
+    filtered = filter(lambda sessions: sessions["Animal"] == mouse,
+                      session_list)
     sessions = list(filtered)
 
     idx = find_dict_index(session_list, "Animal", mouse)
 
     return idx, sessions
+
 
 if __name__ == '__main__':
     find_mouse_sessions("Kerberos")

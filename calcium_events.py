@@ -28,7 +28,7 @@ def load_events(session_index):
     """
     data = CellData(session_index)
 
-    return data.event_times, data.event_values
+    return data.event_times, data.event_values, data.accepted
 
 
 def plot_events(session_index, neurons):
@@ -75,7 +75,7 @@ def overlay_events(session_index, neurons):
 
 
 def make_event_matrix(session_index):
-    event_times, event_values = load_events(session_index)
+    event_times, event_values, accepted = load_events(session_index)
 
     traces, accepted, t = ca_traces.load_traces(session_index)
 
@@ -86,7 +86,7 @@ def make_event_matrix(session_index):
             _, idx = find_closest(t, this_time)
             events[cell, idx] = event_values[cell][i]
 
-    return events
+    return events, accepted
 
 
 if __name__ == '__main__':

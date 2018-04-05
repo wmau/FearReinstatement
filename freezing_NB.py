@@ -217,17 +217,22 @@ if __name__ == '__main__':
 
     s1 = 10
     s2 = [11, 12, 14]
+
+    score_atlas_events = []
+    pval_atlas_events = []
+    score_atlas_traces = []
+    pval_atlas_traces = []
     for s in s2:
         score, permutation_scores, p_value = \
             cross_session_NB2(s1, s, bin_length=2, predictor='events')
 
-        score_nix_events.append(score)
-        pval_nix_events.append(p_value)
+        score_atlas_events.append(score)
+        pval_atlas_events.append(p_value)
 
         score, permutation_scores, p_value = \
             cross_session_NB2(s1, s, bin_length=2, predictor='traces')
 
-        score_nix_traces.append(score)
-        pval_nix_traces.append(p_value)
+        score_atlas_traces.append(score)
+        pval_atlas_traces.append(p_value)
 
     pass

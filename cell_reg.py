@@ -10,6 +10,7 @@ from helper_functions import find_dict_index
 
 session_list = load_session_list()
 
+
 def rename_rejected_ROIs(session_index):
     """
     Rename the bad ROIs so that they don't get registered.
@@ -32,10 +33,11 @@ def rename_rejected_ROIs(session_index):
     # Rename the file so formatFootprints2.m doesn't regiser it.
     for cell, good in enumerate(accepted):
         if not good:
-            new_name = tiffs[cell]       # Python strings are immutable.
-            new_name = new_name + '_'    # So use this silly method instead.
+            new_name = tiffs[cell]  # Python strings are immutable.
+            new_name = new_name + '_'  # So use this silly method instead.
 
             rename(tiffs[cell], new_name)
+
 
 def exclude_bad_cells_in_this_mouse(mouse):
     """
@@ -48,6 +50,7 @@ def exclude_bad_cells_in_this_mouse(mouse):
         if entry["Animal"] == mouse:
             rename_rejected_ROIs(session_index)
 
+
 def load_cellreg_results(mouse):
     """
     After having already running CellRegObj, load the saved pkl file.
@@ -56,14 +59,15 @@ def load_cellreg_results(mouse):
     """
     # Find the directory and navigate to the pkl file.
     mouse_directory = find_mouse_directory(mouse)
-    cellreg_directory = path.join(mouse_directory,'CellRegResults')
-    cellreg_file = path.join(cellreg_directory,'CellRegResults.pkl')
+    cellreg_directory = path.join(mouse_directory, 'CellRegResults')
+    cellreg_file = path.join(cellreg_directory, 'CellRegResults.pkl')
 
     # Open pkl file.
     with open(cellreg_file, 'rb') as file:
         match_map, centroids, footprints = pickle.load(file)
 
     return match_map, centroids, footprints
+
 
 def find_match_map_index(session_indices):
     """
@@ -96,10 +100,22 @@ def find_match_map_index(session_indices):
     return idx
 
 
+def trim_match_map(match_map, session_indices, active_all_days=True):
+    idx = find_match_map_index(session_indices)
+
+    trimmed_map = match_map[:, idx]
+
+    if active_all_days:
+        detected_all_days = (trimmed_map > -1).all(axis=1)
+        trimmed_map = trimmed_map[detected_all_days, :]
+
+    return trimmed_map
+
+
 class CellRegObj:
-    def __init__(self,mouse):
+    def __init__(self, mouse):
         self.mouse = mouse
-        self.data,self.file,self.mouse_directory = \
+        self.data, self.file, self.mouse_directory = \
             self.read_cellreg_output()
         self.compile_cellreg_data()
 
@@ -138,7 +154,7 @@ class CellRegObj:
         footprints = []
         for idx in footprints_reference:
             # Float 32 takes less memory.
-            session_footprints = np.float32(np.transpose(self.file[idx].value,(2,0,1)))
+            session_footprints = np.float32(np.transpose(self.file[idx].value, (2, 0, 1)))
             footprints.append(session_footprints)
 
         return footprints
@@ -161,11 +177,11 @@ class CellRegObj:
         centroids = self.process_centroids()
         footprints = self.process_spatial_footprints()
 
-        filename = path.join(self.cellreg_results_directory,'CellRegResults.pkl')
+        filename = path.join(self.cellreg_results_directory, 'CellRegResults.pkl')
 
-        with open(filename,'wb') as output:
+        with open(filename, 'wb') as output:
             pickle.dump([match_map, centroids, footprints],
-                        output,protocol=4)
+                        output, protocol=4)
 
 
 if __name__ == '__main__':

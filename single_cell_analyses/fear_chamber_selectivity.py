@@ -9,7 +9,7 @@ import scipy.stats as stats
 session_list = load_session_list()
 
 def detect_engram(session_index, neurons='all', bin_length=1):
-    traces, accepted, t = ca_traces.load_traces(session_index)
+    _, _, accepted = ca_events.load_events(session_index)
     events = ca_events.make_event_matrix(session_index)
     session = ff.load_session(session_index)
 
