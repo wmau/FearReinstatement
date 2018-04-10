@@ -6,7 +6,10 @@ import glob
 import h5py
 import numpy as np
 import pickle
-from helper_functions import find_dict_index
+from helper_functions import find_dict_index, ismember
+from cell_data_compiler import CellData
+from plot_helper import ScrollPlot, neuron_number_title
+import plot_functions as plot_funcs
 
 session_list = load_session_list()
 
@@ -22,8 +25,7 @@ def rename_rejected_ROIs(session_index):
     directory = session_list[session_index]["Location"]
     directory = path.join(directory, "ROIs")
 
-    # Get list of accepted neurons.
-    _, accepted, _ = ca_traces.load_traces(session_index)
+    data = CellData(session_index)
 
     tiffs = glob.glob(path.join(directory, 'ROIs_????.*'))
     # Handles BLA sessions.
@@ -31,7 +33,7 @@ def rename_rejected_ROIs(session_index):
         tiffs = glob.glob(path.join(directory, 'ROIs_???.*'))
 
     # Rename the file so formatFootprints2.m doesn't regiser it.
-    for cell, good in enumerate(accepted):
+    for cell, good in enumerate(data.accepted):
         if not good:
             new_name = tiffs[cell]  # Python strings are immutable.
             new_name = new_name + '_'  # So use this silly method instead.
@@ -51,7 +53,7 @@ def exclude_bad_cells_in_this_mouse(mouse):
             rename_rejected_ROIs(session_index)
 
 
-def load_cellreg_results(mouse):
+def load_cellreg_results(mouse, mode='map'):
     """
     After having already running CellRegObj, load the saved pkl file.
     :param mouse:
@@ -61,12 +63,27 @@ def load_cellreg_results(mouse):
     mouse_directory = find_mouse_directory(mouse)
     cellreg_directory = path.join(mouse_directory, 'CellRegResults')
     cellreg_file = path.join(cellreg_directory, 'CellRegResults.pkl')
+    cellreg_footprints_file = path.join(cellreg_directory, 'CellRegFootprints.pkl')
+    cellreg_centroids_file = path.join(cellreg_directory, 'CellRegCentroids.pkl')
 
     # Open pkl file.
-    with open(cellreg_file, 'rb') as file:
-        match_map, centroids, footprints = pickle.load(file)
+    if mode == 'map':
+        with open(cellreg_file, 'rb') as file:
+            match_map = pickle.load(file)
+        return match_map
 
-    return match_map, centroids, footprints
+    elif mode == 'footprints':
+        with open(cellreg_footprints_file, 'rb') as file:
+            footprints = pickle.load(file)
+        return footprints
+
+    elif mode == 'centroids':
+        with open(cellreg_centroids_file, 'rb') as file:
+            centroids = pickle.load(file)
+        return centroids
+
+    else:
+        raise ValueError('Wrong mode.')
 
 
 def find_match_map_index(session_indices):
@@ -75,14 +92,14 @@ def find_match_map_index(session_indices):
     :param session_indices:
     :return:
     """
-    idx = []
-    for session_index in session_indices:
+    # If it's just one session...
+    if isinstance(session_indices, int):
         # Get all session data.
-        mouse = session_list[session_index]["Animal"]
-        date = session_list[session_index]["Date"]
-        session = session_list[session_index]["Session"]
+        mouse = session_list[session_indices]["Animal"]
+        date = session_list[session_indices]["Date"]
+        session = session_list[session_indices]["Session"]
 
-        # Find sessions from this mosue.
+        # Find sessions from this mouse.
         _, sessions = find_mouse_sessions(mouse)
 
         # Find all sessions with the specified date and session number.
@@ -95,7 +112,29 @@ def find_match_map_index(session_indices):
         # Make sure there's only one.
         assert len(matched_session) is 1, "Multiple sessions with these fields!"
 
-        idx.append(matched_session[0])
+        idx = matched_session[0]
+    else:
+        idx = []
+        for session_index in session_indices:
+            # Get all session data.
+            mouse = session_list[session_index]["Animal"]
+            date = session_list[session_index]["Date"]
+            session = session_list[session_index]["Session"]
+
+            # Find sessions from this mouse.
+            _, sessions = find_mouse_sessions(mouse)
+
+            # Find all sessions with the specified date and session number.
+            idx_date = find_dict_index(sessions, "Date", date)
+            idx_session = find_dict_index(sessions, "Session", session)
+
+            # Get session that matches the specified session_index.
+            matched_session = list(set(idx_date) & set(idx_session))
+
+            # Make sure there's only one.
+            assert len(matched_session) is 1, "Multiple sessions with these fields!"
+
+            idx.append(matched_session[0])
 
     return idx
 
@@ -110,6 +149,58 @@ def trim_match_map(match_map, session_indices, active_all_days=True):
         trimmed_map = trimmed_map[detected_all_days, :]
 
     return trimmed_map
+
+
+def plot_footprints_over_days(session_index, neurons):
+    """
+    Plots specified cells across all sessions.
+    :param session_index:
+    :param neurons:
+    :return:
+    """
+    # Get the mouse name.
+    mouse = session_list[session_index]["Animal"]
+
+    # Load the footprints and map.
+    footprints = load_cellreg_results(mouse, mode='footprints')
+    cell_map = load_cellreg_results(mouse)
+    n_sessions = cell_map.shape[1]
+
+    # Get the session in map that corresponds to the session_index.
+    # Then get all row numbers corresponding to the neurons.
+    map_index = find_match_map_index(session_index)
+    _, cell_index = ismember(cell_map[:, map_index], neurons)
+
+    # Create list of arrays containing footprints.
+    # List of size N where N is number of neurons. Each list item is
+    # a set of footprints, one for each day, of the same neuron.
+    footprints_to_plot = []
+    # For each row number...
+    for cell in cell_index:
+        # Preallocate.
+        this_cell_footprints = np.zeros((n_sessions,
+                                         footprints[0].shape[1],
+                                         footprints[0].shape[2])
+                                        )
+
+        # For each day, get the cell number (index for footprints).
+        for day in range(n_sessions):
+            cell_number = cell_map[cell, day]
+
+            # Only get the footprint if the cell was matched that day.
+            if cell_number > -1:
+                this_cell_footprints[day] = footprints[day][cell_number]
+
+        # Append to list.
+        footprints_to_plot.append(this_cell_footprints)
+
+    # Plot.
+    f = ScrollPlot(plot_funcs.plot_footprints_over_days,
+                   n_rows=1, n_cols=n_sessions,
+                   footprints=footprints_to_plot,
+                   figsize=(12, 3))
+
+    return f
 
 
 class CellRegObj:
@@ -143,6 +234,8 @@ class CellRegObj:
         # Get the cell_to_index_map. Reading the file transposes the
         # matrix. Transpose it back.
         cell_to_index_map = self.data['cell_to_index_map'].value.T
+
+        # Matlab indexes starting from 1. Correct this.
         match_map = cell_to_index_map - 1
 
         return match_map.astype(int)
@@ -177,12 +270,20 @@ class CellRegObj:
         centroids = self.process_centroids()
         footprints = self.process_spatial_footprints()
 
-        filename = path.join(self.cellreg_results_directory, 'CellRegResults.pkl')
+        filename = path.join(self.cellreg_results_directory,
+                             'CellRegResults.pkl')
+        filename_footprints = path.join(self.cellreg_results_directory,
+                                        'CellRegFootprints.pkl')
+        filename_centroids = path.join(self.cellreg_results_directory,
+                                       'CellRegCentroids.pkll')
 
         with open(filename, 'wb') as output:
-            pickle.dump([match_map, centroids, footprints],
-                        output, protocol=4)
+            pickle.dump(match_map, output, protocol=4)
+        with open(filename_footprints, 'wb') as output:
+            pickle.dump(footprints, output, protocol=4)
+        with open(filename_centroids, 'wb') as output:
+            pickle.dump(centroids, output, protocol=4)
 
 
 if __name__ == '__main__':
-    find_match_map_index(11)
+    plot_footprints_over_days(0, [1, 2, 5])

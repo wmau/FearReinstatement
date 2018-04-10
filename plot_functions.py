@@ -21,7 +21,7 @@ def plot_events(obj):
         obj: ScrollPlot class object.
     :return:
     """
-    obj.ax.plot(obj.event_times[obj.current_position], obj.event_values[obj.current_position], '.')
+    obj.ax.scatter(obj.event_times[obj.current_position], obj.event_values[obj.current_position],marker='.')
     obj.last_position = len(obj.event_values) - 1
 
 
@@ -33,6 +33,7 @@ def overlay_events(obj):
     :return:
     """
     plot_traces(obj)
+    plt.hold(True)
     plot_events(obj)
 
 
@@ -77,7 +78,7 @@ def plot_freezing_traces(obj):
 
     obj.last_position = len(obj.traces) - 1
 
-def heatmap(obj):
+def plot_heatmap(obj):
     obj.ax.imshow(obj.heatmap[obj.current_position])
     plt.axis('tight')
 
@@ -89,3 +90,11 @@ def plot_multiple_traces(obj):
         obj.ax.plot(obj.t,trace,color=c)
 
     obj.last_position = len(obj.traces) - 1
+
+def plot_footprints_over_days(obj):
+    for i,footprint in enumerate(obj.footprints[obj.current_position]):
+        obj.ax[i].imshow(footprint, cmap='gray')
+        obj.ax[i].axis('equal')
+        obj.ax[i].axis('off')
+
+    obj.last_position = len(obj.footprints) - 1
