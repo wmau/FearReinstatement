@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import calcium_traces as ca_traces
 from helper_functions import find_closest
 import numpy as np
+from os import path
+from pickle import load, dump
 
 session_list = load_session_list()
 
@@ -28,7 +30,7 @@ def load_events(session_index):
     """
     data = CellData(session_index)
 
-    return data.event_times, data.event_values, data.accepted
+    return data.event_times, data.event_values
 
 
 def plot_events(session_index, neurons):
@@ -39,7 +41,7 @@ def plot_events(session_index, neurons):
             neurons: List of neurons.
         :return
             f: ScrollPlot class.
-        """
+    """
     # Load events.
     event_times, event_values = load_events(session_index)
 
@@ -62,7 +64,7 @@ def overlay_events(session_index, neurons):
     """
     # Load events and traces.
     event_times, event_values = load_events(session_index)
-    traces, _, t = ca_traces.load_traces(session_index)
+    traces, t = ca_traces.load_traces(session_index)
 
     # Plot and scroll.
     titles = neuron_number_title(neurons)
@@ -75,19 +77,28 @@ def overlay_events(session_index, neurons):
 
 
 def make_event_matrix(session_index):
-    event_times, event_values, accepted = load_events(session_index)
+    directory = session_list[session_index]["Location"]
+    file_path = path.join(directory, "EventMatrix.pkl")
+    try:
+        with open(file_path, 'rb') as file:
+            events = load(file)
+    except:
+        event_times, event_values = load_events(session_index)
 
-    traces, accepted, t = ca_traces.load_traces(session_index)
+        traces, t = ca_traces.load_traces(session_index)
 
-    events = np.zeros(traces.shape)
+        events = np.zeros(traces.shape)
 
-    for cell, timestamps in enumerate(event_times):
-        for i, this_time in enumerate(timestamps):
-            _, idx = find_closest(t, this_time)
-            events[cell, idx] = event_values[cell][i]
+        for cell, timestamps in enumerate(event_times):
+            for i, this_time in enumerate(timestamps):
+                _, idx = find_closest(t, this_time)
+                events[cell, idx] = event_values[cell][i]
 
-    return events, accepted
+        with open(file_path, 'wb') as file:
+            dump(events, file, protocol=4)
+
+    return events
 
 
 if __name__ == '__main__':
-    make_event_matrix(0)
+    overlay_events(0,[1,2,3,4,5])
