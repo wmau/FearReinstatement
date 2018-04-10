@@ -14,6 +14,10 @@ import plot_functions as plot_funcs
 import ff_video_fixer as FF
 import cell_stats
 import numpy as np
+from cell_reg import load_cellreg_results, find_match_map_index
+from session_directory import find_mouse_sessions
+from helper_functions import ismember
+from scipy.stats import zscore
 
 session_list = load_session_list()
 
@@ -94,7 +98,8 @@ def freezing_trace_heatmap(session_index, neurons='all'):
     longest_freeze = freeze_durations.max()
 
     # Preallocate heatmap.
-    freezing_traces = np.full([n_neurons, n_freezes, longest_freeze], np.nan)
+    freezing_traces = np.full([n_neurons, n_freezes, longest_freeze],
+                              np.nan)
 
     for n in neurons:
         for i,epoch in enumerate(freeze_epochs):
@@ -107,7 +112,59 @@ def freezing_trace_heatmap(session_index, neurons='all'):
                    xlabel='Time from start of freezing (s)', ylabel='Freezing bout #', titles=titles)
 
 def plot_traces_over_days(session_index, neurons):
-    
+    # Get the mouse.
+    mouse = session_list[session_index]["Animal"]
+
+    # Load the cell map.
+    cell_map = load_cellreg_results(mouse)
+    n_sessions = cell_map.shape[1]
+
+    # Find all the sessions from this mouse.
+    sessions_from_this_mouse, _ = find_mouse_sessions(mouse)
+
+    # Make sure this matches the number of sessions in the cell map.
+    assert len(sessions_from_this_mouse) == n_sessions, \
+        "Number of sessions do not agree."
+
+    traces = []
+    t = []
+    # Compile all the traces and time vectors
+    for session in sessions_from_this_mouse:
+        day_traces, day_t = load_traces(session)
+        traces.append(zscore(day_traces, axis=0))
+        t.append(day_t)
+
+    # Get the column of cell map that corresponds to the specified session.
+    map_index = find_match_map_index(session_index)
+
+    # Get the cell numbers.
+    _, cell_index = ismember(cell_map[:, map_index], neurons)
+
+    # Compile traces, matching by cell.
+    traces_to_plot = []
+    for cell in cell_index:
+        this_cell_traces = []
+
+        for day in range(n_sessions):
+            cell_number = cell_map[cell, day]
+
+            # Make sure there was actually a match, otherwise insert
+            # a placeholder.
+            if cell_number > -1:
+                this_cell_traces.append(traces[day][cell_number])
+            else:
+                placeholder = np.zeros(t[day].shape)
+                this_cell_traces.append(placeholder)
+
+        traces_to_plot.append(this_cell_traces)
+
+    # Plot.
+    f = ScrollPlot(plot_funcs.plot_traces_over_days,
+                   n_rows=1, n_cols=n_sessions, share_y=True, share_x=True,
+                   t=t, traces=traces_to_plot, figsize=(12,3))
+
+    return f
+
 
 if __name__ == '__main__':
-    freezing_trace_heatmap(1,[1,2,5])
+    plot_traces_over_days(0,[1,2,5])

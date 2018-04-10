@@ -21,7 +21,7 @@ class ScrollPlot:
     """
 
     # Initialize the class. Gather the data and labels.
-    def __init__(self, plot_func, xlabel = 'x', ylabel = 'y',
+    def __init__(self, plot_func, xlabel = '', ylabel = '',
                  titles = ([' '] * 10000), **kwargs):
         self.plot_func = plot_func
         self.xlabel = xlabel
@@ -30,7 +30,8 @@ class ScrollPlot:
         self.n_rows = 1
         self.n_cols = 1
         self.share_y = False
-        self.figsize = (640,478)
+        self.share_x = False
+        self.figsize = (8,6)
 
         # Dump all arguments into ScrollPlot.
         for key,value in kwargs.items():
@@ -38,6 +39,7 @@ class ScrollPlot:
 
         self.fig, (self.ax) = plt.subplots(self.n_rows, self.n_cols,
                                            sharey=self.share_y,
+                                           sharex=self.share_x,
                                            figsize = self.figsize)
 
         # Necessary for scrolling.

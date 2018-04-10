@@ -98,3 +98,9 @@ def plot_footprints_over_days(obj):
         obj.ax[i].axis('off')
 
     obj.last_position = len(obj.footprints) - 1
+
+def plot_traces_over_days(obj):
+    for i,trace in enumerate(obj.traces[obj.current_position]):
+        obj.ax[i].plot(obj.t[i],trace)
+
+    obj.last_position = len(obj.traces) - 1

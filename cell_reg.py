@@ -1,7 +1,6 @@
 from os import path, rename
 from session_directory import load_session_list, find_mouse_directory, \
     find_mouse_sessions
-import calcium_traces as ca_traces
 import glob
 import h5py
 import numpy as np
@@ -151,7 +150,7 @@ def trim_match_map(match_map, session_indices, active_all_days=True):
     return trimmed_map
 
 
-def plot_footprints_over_days(session_index, neurons):
+def plot_footprints_over_days(session_index, neurons, zoom=True):
     """
     Plots specified cells across all sessions.
     :param session_index:
@@ -175,14 +174,12 @@ def plot_footprints_over_days(session_index, neurons):
     # List of size N where N is number of neurons. Each list item is
     # a set of footprints, one for each day, of the same neuron.
     footprints_to_plot = []
+    x_dim = footprints[0].shape[1]
+    y_dim = footprints[0].shape[2]
     # For each row number...
     for cell in cell_index:
         # Preallocate.
-        this_cell_footprints = np.zeros((n_sessions,
-                                         footprints[0].shape[1],
-                                         footprints[0].shape[2])
-                                        )
-
+        this_cell_footprints = np.zeros((n_sessions, x_dim, y_dim))
         # For each day, get the cell number (index for footprints).
         for day in range(n_sessions):
             cell_number = cell_map[cell, day]
@@ -197,6 +194,7 @@ def plot_footprints_over_days(session_index, neurons):
     # Plot.
     f = ScrollPlot(plot_funcs.plot_footprints_over_days,
                    n_rows=1, n_cols=n_sessions,
+                   share_x=True, share_y=True,
                    footprints=footprints_to_plot,
                    figsize=(12, 3))
 
