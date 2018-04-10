@@ -21,7 +21,7 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
     session = ff.load_session(session_index)
 
     # Get accepted neurons.
-    predictor_var, accepted, t = ca_traces.load_traces(session_index)
+    predictor_var, t = ca_traces.load_traces(session_index)
     if predictor == 'traces':
         predictor_var = zscore(predictor_var, axis=0)
     elif predictor == 'events':
@@ -29,12 +29,12 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
     else:
         raise ValueError('Predictor incorrectly defined.')
 
-    neurons = d_pp.filter_good_neurons(accepted)
-    n_neurons = len(neurons)
+    n_neurons = len(predictor_var)
 
     # Trim the traces to only include instances where mouse is in the chamber.
     t = d_pp.trim_session(t, session.mouse_in_cage)
-    predictor_var = d_pp.trim_session(predictor_var, session.mouse_in_cage)
+    predictor_var = d_pp.trim_session(predictor_var,
+                                      session.mouse_in_cage)
     freezing = d_pp.trim_session(session.imaging_freezing,
                                  session.mouse_in_cage)
 
@@ -45,8 +45,8 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
 
     # Bin the imaging data.
     X = np.zeros([n_samples, n_neurons])
-    for n, this_neuron in enumerate(neurons):
-        binned_activity = d_pp.bin_time_series(predictor_var[this_neuron], bins)
+    for n, trace in enumerate(predictor_var):
+        binned_activity = d_pp.bin_time_series(trace, bins)
         # X[:, n] = [np.mean(chunk) for chunk in binned_activity]
         X[:, n] = [np.sum(chunk > 0) for chunk in binned_activity]
 
@@ -102,7 +102,7 @@ def preprocess_NB_cross_session(train_session, test_session,
                                    predictor=predictor)
 
     # Get registration map.
-    match_map, _, _ = load_cellreg_results(mouse)
+    match_map = load_cellreg_results(mouse)
 
     idx = find_match_map_index([train_session, test_session])
 

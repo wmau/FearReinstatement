@@ -34,7 +34,7 @@ def load_traces(session_index):
     # Gather data.
     data = CellData(session_index)
 
-    return data.traces.astype(np.float), data.accepted, data.t.astype(np.float)
+    return data.traces.astype(np.float), data.t.astype(np.float)
 
 def plot_traces(session_index, neurons):
     """
@@ -47,7 +47,7 @@ def plot_traces(session_index, neurons):
     """
 
     # Load the traces.
-    [traces, accepted, t] = load_traces(session_index)
+    traces, t = load_traces(session_index)
 
     # Scroll through.
     titles = neuron_number_title(neurons)
@@ -66,19 +66,13 @@ def plot_freezing_traces(session_index):
     freeze_epochs = session.get_freezing_epochs_imaging_framerate()
 
     # Load trace data.
-    [traces, accepted, t] = load_traces(session_index)
+    traces, t = load_traces(session_index)
 
     f = ScrollPlot(plot_funcs.plot_freezing_traces,
                    t=t, traces=traces, epochs=freeze_epochs, n_rows=freeze_epochs.shape[0],
                    share_y=True,  xlabel='Time (s)', ylabel='%DF/F')
 
 def freezing_trace_heatmap(session_index, neurons='all'):
-    if neurons == 'all':
-        n_neurons = cell_stats.get_number_of_ICs(session_index)
-        neurons = np.arange(n_neurons)
-    else:
-        n_neurons = len(neurons)
-
     # Load the position data.
     session = FF.load_session(session_index)
 
@@ -86,7 +80,13 @@ def freezing_trace_heatmap(session_index, neurons='all'):
     freeze_epochs = session.get_freezing_epochs_imaging_framerate()
 
     # Load trace data.
-    [traces, accepted, t] = load_traces(session_index)
+    traces, t = load_traces(session_index)
+
+    if neurons == 'all':
+        n_neurons = len(traces)
+        neurons = arange(n_neurons)
+    else:
+        n_neurons = len(neurons)
 
     # Get dimensions for heatmap.
     n_freezes = freeze_epochs.shape[0]
@@ -96,15 +96,18 @@ def freezing_trace_heatmap(session_index, neurons='all'):
     # Preallocate heatmap.
     freezing_traces = np.full([n_neurons, n_freezes, longest_freeze], np.nan)
 
-    for n,this_neuron in enumerate(neurons):
+    for n in neurons:
         for i,epoch in enumerate(freeze_epochs):
-            freezing_traces[n,i,np.arange(freeze_durations[i])] = traces[this_neuron,epoch[0]:epoch[1]]
+            freezing_traces[n,i,np.arange(freeze_durations[i])] = \
+                traces[n,epoch[0]:epoch[1]]
 
     titles = neuron_number_title(neurons)
     f = ScrollPlot(plot_funcs.heatmap,
                    heatmap = freezing_traces,
                    xlabel='Time from start of freezing (s)', ylabel='Freezing bout #', titles=titles)
 
+def plot_traces_over_days(session_index, neurons):
+    
 
 if __name__ == '__main__':
     freezing_trace_heatmap(1,[1,2,5])

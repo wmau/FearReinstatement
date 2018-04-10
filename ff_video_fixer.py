@@ -177,7 +177,7 @@ class FFObj:
         """
         Match timestamps and position to imaging.
         """
-        _,_,imaging_t = ca_traces.load_traces(self.session_index)
+        _,imaging_t = ca_traces.load_traces(self.session_index)
         x = np.interp(imaging_t, self.video_t, self.position[:, 0])
         y = np.interp(imaging_t, self.video_t, self.position[:, 1])
 

@@ -14,17 +14,16 @@ from scipy.stats import zscore
 session_list = load_session_list()
 
 
-def PCA_session(session_index, bin_length=2):
+def PCA_session(session_index, bin_length=1):
     session = FF.load_session(session_index)
 
     # Get accepted neurons.
-    traces, accepted, t = ca_traces.load_traces(session_index)
+    traces, t = ca_traces.load_traces(session_index)
     traces = zscore(traces, axis=0)
     # traces = ca_events.make_event_matrix(session_index)       # If you want events (not traces).
     scaler = StandardScaler()
     traces = scaler.fit_transform(traces)
-    neurons = d_pp.filter_good_neurons(accepted)
-    n_neurons = len(neurons)
+    n_neurons = len(traces)
 
     # Trim the traces to only include instances where mouse is in the chamber.
     t = d_pp.trim_session(t, session.mouse_in_cage)
@@ -36,8 +35,8 @@ def PCA_session(session_index, bin_length=2):
     n_samples = len(bins) + 1
 
     X = np.zeros([n_samples, n_neurons])
-    for n, this_neuron in enumerate(neurons):
-        binned_activity = d_pp.bin_time_series(traces[this_neuron], bins)
+    for n, trace in enumerate(traces):
+        binned_activity = d_pp.bin_time_series(trace, bins)
         avg_activity = [np.mean(chunk) for chunk in binned_activity]
 
         X[:, n] = avg_activity
@@ -62,4 +61,4 @@ def PCA_session(session_index, bin_length=2):
 
 
 if __name__ == '__main__':
-    PCA_session(14)
+    PCA_session(1)

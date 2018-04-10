@@ -2,7 +2,8 @@ import numpy as np
 
 
 def filter_good_neurons(accepted):
-    neurons = [cell_number for cell_number, good in enumerate(accepted) if good]
+    neurons = [cell_number for cell_number, good in
+               enumerate(accepted) if good]
 
     return neurons
 
