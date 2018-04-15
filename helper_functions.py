@@ -16,7 +16,14 @@ def ismember(A, B):
     """
 
     A_in_B = np.in1d(A, B)
-    B_idx = np.nonzero(A_in_B)[0]
+
+    B_idx = np.zeros(len(B), dtype=int)
+    A = list(A)
+    for i,element in enumerate(B):
+        try:
+            B_idx[i] = int(A.index(element))
+        except:
+            B_idx[i] = 0
 
     return A_in_B, B_idx
 
