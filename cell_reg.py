@@ -150,7 +150,7 @@ def trim_match_map(match_map, session_indices, active_all_days=True):
     return trimmed_map
 
 
-def plot_footprints_over_days(session_index, neurons, zoom=True):
+def plot_footprints_over_days(session_index, neurons):
     """
     Plots specified cells across all sessions.
     :param session_index:
@@ -199,6 +199,11 @@ def plot_footprints_over_days(session_index, neurons, zoom=True):
                    figsize=(12, 3))
 
     return f
+
+def find_cell_in_map(map, map_index, neurons):
+    _, cell_index = ismember(map[:, map_index], neurons)
+
+    return cell_index
 
 
 class CellRegObj:
