@@ -18,7 +18,7 @@ from cell_reg import load_cellreg_results, find_cell_in_map, \
 import matplotlib.pyplot as plt
 import scipy.signal as signal
 import itertools
-
+from single_cell_analyses.computations import xcorr_all_neurons
 
 session_list = load_session_list()
 
@@ -32,8 +32,24 @@ def load_aligned_data(session_index):
 
     return shock_cells, aligned_traces, aligned_events
 
+def plot_xcorr_over_days(S1, S2, neuron_pair):
+    map = S1.map
 
-class ShockObj:
+    map_idx = find_match_map_index([S1.session_index, S2.session_index])
+    global_cell_1 = find_cell_in_map(map, map_idx[0], neuron_pair[0])
+    global_cell_2 = find_cell_in_map(map, map_idx[0], neuron_pair[1])
+
+    plt.figure()
+
+    plt.plot(S1.window, S1.xcorrs[neuron_pair[0], neuron_pair[1]], c='b')
+
+    cell_1 = map[global_cell_1, map_idx[1]]
+    cell_2 = map[global_cell_2, map_idx[1]]
+    plt.plot(S2.window, S2.xcorrs[cell_1, cell_2], c='k')
+
+
+
+class ShockResponse:
     def __init__(self, session_index, window=[-1, 15]):
         self.session_index = session_index
         self.frame_rate = 20
@@ -182,15 +198,22 @@ class ShockObj:
                   self.aligned_events], file)
 
 
-class ShockNetwork:
-    def __init__(self, session_index):
+class ShockXCorr:
+    def __init__(self, session_index, xcorr_window=[-15,15]):
+        self.session_index = session_index
+
         # Load shock-aligned cells, traces, and events.
-        shock_cells, self.aligned_traces, self.aligned_events = \
-            load_aligned_data(session_index)
-        self.shock_cells = np.asarray(shock_cells)
+        try:
+            shock_cells, self.aligned_traces, self.aligned_events = \
+                load_aligned_data(session_index)
+            self.shock_cells = np.asarray(shock_cells)
+        except:
+            print("Shock-aligned traces not detected.")
+
 
         # Load full traces.
         traces, _ = ca_traces.load_traces(session_index)
+        self.n_neurons = len(traces)
 
         # Get mouse in chamber indices.
         session = ff.load_session(session_index)
@@ -199,129 +222,36 @@ class ShockNetwork:
         mouse = session_list[session_index]["Animal"]
         self.map = load_cellreg_results(mouse)
 
-        self.build_corr_matrix()
+        xcorr_window.sort()
+        self.xcorr_window = np.asarray(xcorr_window)
 
-    def build_corr_matrix(self, mode='xcorr'):
-        # Get the traces and number of cells.
-        shock_traces = self.traces[self.shock_cells]
-        n_shock_cells = len(self.shock_cells)
+        assert len(self.xcorr_window) is 2, "Window length must be 2."
+        assert any(self.xcorr_window < 0), "One input must be positive."
+        assert any(self.xcorr_window > 0), "One input must be negative."
 
-        if mode == 'corr':
-            # If simple linear correlation, corcoeff populates the
-            # matrix in one go.
-            coefficients = np.corrcoef(shock_traces)
-            best_lag = np.zeros(n_shock_cells)
+        directory = session_list[session_index]["Location"]
+        xcorr_file = path.join(directory, 'CrossCorrelations.pkl')
 
-        elif mode == 'xcorr':
-            # If cross-correlation, allocate some matrices first.
-            best_lag = np.zeros((n_shock_cells, n_shock_cells))
-            coefficients = np.full((n_shock_cells,
-                                    n_shock_cells),np.nan)
-            matrix_indices = np.unravel_index(
-                                        np.arange(coefficients.size),
-                                        coefficients.shape)
+        try:
+            with open(xcorr_file, 'rb') as file:
+                self.xcorrs, self.best_lags, self.window = load(file)
+        except:
+            self.xcorrs, self.best_lags, self.window = \
+                xcorr_all_neurons(self.traces, self.xcorr_window)
 
-            # Define the lag vector.
-            n_samples = len(shock_traces[0])
-            x_axis = np.arange(n_samples * 2 - 1)
-            lags = (x_axis - (n_samples - 1))*0.05
+            self.save_xcorrs()
 
-            # Define your window and get its indices.
-            window = np.arange(-15,15)
-            _, window_idx = ismember(lags, window)
 
-            # Get all pairwise combinations.
-            combinations = list(itertools.product(shock_traces, shock_traces))
-            for i, (trace_1, trace_2) in enumerate(combinations):
-                # Perform cross-correlation then normalize.
-                xcorr = signal.correlate(trace_1, trace_2)
-                #xcorr /= max(xcorr)
+    def save_xcorrs(self):
+        directory = session_list[self.session_index]["Location"]
+        file_path = path.join(directory, 'CrossCorrelations.pkl')
 
-                # Get the appropriate index.
-                row = matrix_indices[0][i]
-                col = matrix_indices[1][i]
-
-                # Dump the maximum cross-correlation coefficient
-                # and the corresponding time lag in seconds.
-                coefficients[row, col] = max(xcorr[window_idx])
-                best_lag[row, col] = window[np.argmax(xcorr[window_idx])]
-
-        # Populate identity with NaNs.
-        np.fill_diagonal(coefficients, np.nan)
-
-        return coefficients, best_lag
-
-    def get_max_corr(self, coeffs):
-        max_coeff = np.nanmax(coeffs, axis=1)
-        most_corr_cell = self.shock_cells[np.nanargmax(coeffs, axis=1)]
-
-        return max_coeff, most_corr_cell
-
-    def corr_again(self, session_index, mode='corr'):
-        # Of all the sessions from this mouse, get the session number
-        # from the input.
-        map_index = find_match_map_index(session_index)
-
-        # Get the cell numbers for all the shock-responsive cells from
-        # fear conditioning day.
-        shock_cell_idx = find_cell_in_map(self.map, 0, self.shock_cells)
-        shock_cell_number = self.map[shock_cell_idx, map_index]
-
-        # Get the correlation matrix from fear conditioning day.
-        conditioning_coeffs, best_lag = self.build_corr_matrix(mode=mode)
-
-        # Get the correlation coefficient of the highest correlated cell
-        # and the cell number.
-        max_coeffs, most_corr_cell_fc = \
-            self.get_max_corr(conditioning_coeffs)
-
-        # Get those cells' numbers on this session.
-        most_corr_cell_idx = \
-            find_cell_in_map(self.map, 0, most_corr_cell_fc)
-        most_corr_cell_number = self.map[most_corr_cell_idx, map_index]
-
-        # Omit the cells that weren't registered.
-        shock_cell_number = shock_cell_number[shock_cell_number > -1]
-        most_corr_cell_number = \
-            most_corr_cell_number[most_corr_cell_number > -1]
-
-        traces, _ = ca_traces.load_traces(session_index)
-        session = ff.load_session(session_index)
-        traces = d_pp.trim_session(traces, session.mouse_in_cage)
-
-        new_coeffs = []
-        if mode == 'corr':
-            for cell_1, cell_2 in zip(shock_cell_number, most_corr_cell_number):
-                r, _ = pearsonr(traces[cell_1], traces[cell_2])
-                new_coeffs.append(r)
-        elif mode == 'xcorr':
-            # Define the lag vector.
-            n_samples = len(traces[0])
-            x_axis = np.arange(n_samples * 2 - 1)
-            lags = -(x_axis - (n_samples - 1)) * 0.05
-
-            for cell_1, cell_2 in zip(shock_cell_number,
-                                      most_corr_cell_number):
-                xcorr = signal.correlate(traces[cell_1], traces[cell_2])
-                #xcorr /= max(xcorr)
-
-                _, i = ismember(self.map[:, map_index], cell_1)
-                _, i = ismember(self.shock_cells, self.map[i, 0])
-
-                _, j = ismember(self.map[:, map_index], cell_2)
-                _, j = ismember(self.shock_cells, self.map[j, 0])
-
-                _, idx = ismember(lags, best_lag[i, j])
-                new_coeffs.append(xcorr[idx])
-
-        return new_coeffs, max_coeffs
-
+        with open(file_path, 'wb') as file:
+            dump([self.xcorrs, self.best_lags, self.window], file)
 
 
 if __name__ == '__main__':
-    S = ShockNetwork(5)
-    ext1, max_coeffs_ext1 = S.corr_again(6, 'xcorr')
-    ext2, max_coeffs_ext2 = S.corr_again(7, 'xcorr')
-    recall, max_coeffs_recall = S.corr_again(9, 'xcorr')
+    FC = ShockXCorr(0)
+    EXT1 = ShockXCorr(1)
 
     pass
