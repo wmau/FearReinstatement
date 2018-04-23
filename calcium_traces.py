@@ -18,6 +18,8 @@ from cell_reg import load_cellreg_results, find_match_map_index
 from session_directory import find_mouse_sessions
 from helper_functions import ismember
 from scipy.stats import zscore
+import scipy.io as sio
+import data_preprocessing as d_pp
 
 session_list = load_session_list()
 
@@ -39,6 +41,21 @@ def load_traces(session_index):
     data = CellData(session_index)
 
     return data.traces.astype(np.float), data.t.astype(np.float)
+
+def save_traces(session_index):
+    from ff_video_fixer import load_session
+
+    entire_session_traces, _ = load_traces(session_index)
+    session = load_session(session_index)
+    traces = d_pp.trim_session(entire_session_traces,
+                               session.mouse_in_cage)
+
+    directory = session_list[session_index]["Location"]
+    file = path.join(directory, 'Traces.mat')
+
+    sio.savemat(file,{'traces': traces,
+                      'traces_all': entire_session_traces})
+
 
 def plot_traces(session_index, neurons):
     """
@@ -131,7 +148,7 @@ def plot_traces_over_days(session_index, neurons):
     # Compile all the traces and time vectors
     for session in sessions_from_this_mouse:
         day_traces, day_t = load_traces(session)
-        traces.append(zscore(day_traces, axis=0))
+        traces.append(zscore(day_traces, axis=1))
         t.append(day_t)
 
     # Get the column of cell map that corresponds to the specified session.
