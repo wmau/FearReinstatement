@@ -180,6 +180,7 @@ class FFObj:
         _,imaging_t = ca_traces.load_traces(self.session_index)
         x = np.interp(imaging_t, self.video_t, self.position[:, 0])
         y = np.interp(imaging_t, self.video_t, self.position[:, 1])
+        imaging_v = np.interp(imaging_t, self.video_t, self.velocity)
 
         imaging_freezing = np.zeros(imaging_t.shape, dtype=bool)
         freezing_epochs = self.get_freezing_epochs()
@@ -192,7 +193,7 @@ class FFObj:
                                       self.video_t[this_epoch[1]-1])
             imaging_freezing[start_idx:end_idx] = True
 
-        return x,y,imaging_t,imaging_freezing
+        return x,y,imaging_t,imaging_freezing,imaging_v
 
     def detect_freezing(self,velocity_threshold, min_freeze_duration,
                         plot_freezing):
@@ -295,8 +296,8 @@ class FFObj:
         self.auto_detect_mouse(smooth_sigma, mouse_threshold)
         self.detect_freezing(velocity_threshold, min_freeze_duration,
                              plot_freezing)
-        self.x,self.y,self.imaging_t,self.imaging_freezing = \
-            self.interpolate()
+        self.x,self.y,self.imaging_t,self.imaging_freezing, \
+            self.imaging_velocity = self.interpolate()
         self.get_mouse_in_cage_epoch()
 
     def save_data(self):
