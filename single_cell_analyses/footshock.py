@@ -32,24 +32,50 @@ def load_aligned_data(session_index):
 
     return shock_cells, aligned_traces, aligned_events
 
-def plot_xcorr_over_days(S1, S2, neuron_pair):
-    map = S1.map
+def plot_xcorr_over_days(XCorrObj1, XCorrObj2, neuron_pair):
+    map = XCorrObj1.map
 
-    map_idx = find_match_map_index([S1.session_index, S2.session_index])
+    map_idx = find_match_map_index([XCorrObj1.session_index, XCorrObj2.session_index])
     global_cell_1 = find_cell_in_map(map, map_idx[0], neuron_pair[0])
     global_cell_2 = find_cell_in_map(map, map_idx[0], neuron_pair[1])
 
+    # Plot day 1 cross-correlation.
     plt.figure()
+    plt.plot(XCorrObj1.window, XCorrObj1.xcorrs[neuron_pair[0], neuron_pair[1]], c='b')
 
-    plt.plot(S1.window, S1.xcorrs[neuron_pair[0], neuron_pair[1]], c='b')
-
+    # Plot day 2 cross-correlation.
     cell_1 = map[global_cell_1, map_idx[1]]
     cell_2 = map[global_cell_2, map_idx[1]]
-    plt.plot(S2.window, S2.xcorrs[cell_1, cell_2], c='k')
+    plt.plot(XCorrObj2.window, XCorrObj2.xcorrs[cell_1, cell_2], c='k')
 
+    plt.title("Neuron " + str(neuron_pair[0]) +
+              " with Neuron " + str(neuron_pair[1]))
 
+def plot_sequence_over_days(FC_session, test_session):
+    FC = ShockSequence(FC_session)
+    mouse = session_list[FC_session]["Animal"]
 
-class ShockResponse:
+    assert mouse == session_list[test_session]["Animal"], \
+        "Mice in sessions you're comparing are different!"
+    match_map = load_cellreg_results(mouse)
+
+    map_idx = find_match_map_index([FC.session_index, test_session])
+    shock_cells_global = find_cell_in_map(match_map, map_idx[0],
+                                          FC.shock_modulated_cells)
+
+    shock_cells_local = match_map[shock_cells_global, map_idx[1]]
+    shock_cells_local_sorted = shock_cells_local[FC.order]
+    shock_cells_local_sorted = \
+        shock_cells_local_sorted[shock_cells_local_sorted > 0]
+
+    traces, _ = ca_traces.load_traces(test_session)
+    traces = zscore(traces, axis=1)
+
+    plt.imshow(traces[shock_cells_local_sorted])
+
+    pass
+
+class ShockSequence:
     def __init__(self, session_index, window=[-1, 15]):
         self.session_index = session_index
         self.frame_rate = 20
@@ -66,12 +92,21 @@ class ShockResponse:
         self.footshock_times = [698, 778, 858, 938]
         traces, self.t = \
             ca_traces.load_traces(session_index)
+
         self.events = ca_events.make_event_matrix(session_index)
         self.traces = zscore(traces, axis=0)
         self.n_neurons = len(traces)
-        self.align_neurons()
-        self.create_shuffle_tuning_curve()
-        self.find_modulated_cells()
+
+        try:
+            self.shock_modulated_cells, self.aligned_traces, \
+                self.aligned_events = load_aligned_data(session_index)
+            self.make_tuning_curves()
+        except:
+            self.align_neurons()
+            self.create_shuffle_tuning_curve()
+            self.find_modulated_cells()
+
+        self.order = self.organize_sequence()
 
     def align_trace(self, window, trace):
         n_back = window[0]
@@ -136,22 +171,25 @@ class ShockResponse:
 
             self.surrogate[neuron] = shuffled
 
+    def make_tuning_curves(self):
+        self.tuning_curves = []
+        for trace in self.aligned_traces:
+            tuning_curve = np.mean(trace, axis=0)
+            self.tuning_curves.append(tuning_curve)
+
     def find_modulated_cells(self):
         """
         Find cells that are modulated by the shock with a shuffling
         method.
         :return:
         """
+        self.make_tuning_curves()
+
         B = self.surrogate[0].shape[0]
         self.shock_modulated_cells = []
-        self.tuning_curves = []
-        for traces, events, shuffled, neuron in \
-                zip(self.aligned_traces, self.aligned_events,
-                    self.surrogate, np.arange(self.n_neurons)):
-
-            # Take the mean of the response across shocks.
-            tuning_curve = np.mean(traces, axis=0)
-            self.tuning_curves.append(tuning_curve)
+        for tuning_curve, event, shuffled, neuron in \
+                zip(self.tuning_curves, self.aligned_events,
+                    self.surrogate, range(self.n_neurons)):
 
             # Get the p-value, the percentage of shuffled tuning curves
             # with a higher amplitude response than the real data.
@@ -162,25 +200,32 @@ class ShockResponse:
             # active for at least 3 of the 4 shocks.
             if any(p_value < 0.01):
                 if get_longest_run(p_value < 0.01) > 3 and \
-                        np.sum(events.any(axis=1)) > 1:
+                        np.sum(event.any(axis=1)) > 1:
                     self.shock_modulated_cells.append(neuron)
+
+    def organize_sequence(self):
+        # Normalize all the tuning curves.
+        tuning_curves = np.asarray(self.tuning_curves)[self.shock_modulated_cells]
+        tuning_curves = normalize(tuning_curves, norm='max')
+
+        # Get peak indices.
+        peaks = np.argmax(tuning_curves, axis=1)
+
+        # Get order of peaks.
+        order = np.argsort(peaks)
+
+        return order
 
     def plot_sequence(self):
         # Convert to array. Then normalize.
         tuning_curves = np.asarray(self.tuning_curves)[self.shock_modulated_cells]
         tuning_curves = normalize(tuning_curves, norm='max')
 
-        # Get the peaks.
-        peaks = np.argmax(tuning_curves, axis=1)
-
-        # Sort the peaks and get their order.
-        order = np.argsort(peaks)
-
         n_modulated_cells = len(self.shock_modulated_cells)
 
         # Plot.
         plt.figure(figsize=(4, 5))
-        plt.imshow(tuning_curves[order],
+        plt.imshow(tuning_curves[self.order],
                    extent=[self.ref_time[0], self.ref_time[-1],
                            n_modulated_cells, 0])
         plt.axis('tight')
@@ -251,7 +296,6 @@ class ShockXCorr:
 
 
 if __name__ == '__main__':
-    FC = ShockXCorr(0)
-    EXT1 = ShockXCorr(1)
+    plot_sequence_over_days(0,1)
 
     pass
