@@ -99,6 +99,5 @@ def make_event_matrix(session_index):
 
     return events
 
-
 if __name__ == '__main__':
     overlay_events(0,[1,2,3,4,5])

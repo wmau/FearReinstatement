@@ -201,9 +201,9 @@ def plot_footprints_over_days(session_index, neurons):
     return f
 
 def find_cell_in_map(map, map_index, neurons):
-    _, cell_index = ismember(map[:, map_index], neurons)
+    _, global_cell_index = ismember(map[:, map_index], neurons)
 
-    return cell_index
+    return global_cell_index.astype(int)
 
 
 class CellRegObj:
@@ -278,7 +278,7 @@ class CellRegObj:
         filename_footprints = path.join(self.cellreg_results_directory,
                                         'CellRegFootprints.pkl')
         filename_centroids = path.join(self.cellreg_results_directory,
-                                       'CellRegCentroids.pkll')
+                                       'CellRegCentroids.pkl')
 
         with open(filename, 'wb') as output:
             pickle.dump(match_map, output, protocol=4)

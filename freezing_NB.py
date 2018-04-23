@@ -23,7 +23,7 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
     # Get accepted neurons.
     predictor_var, t = ca_traces.load_traces(session_index)
     if predictor == 'traces':
-        predictor_var = zscore(predictor_var, axis=0)
+        predictor_var = zscore(predictor_var, axis=1)
     elif predictor == 'events':
         predictor_var = ca_events.make_event_matrix(session_index)
     else:
