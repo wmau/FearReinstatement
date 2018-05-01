@@ -56,3 +56,20 @@ def get_longest_run(list):
         in groupby(list) if val)
 
     return length
+
+def get_event_rate(events):
+    assert np.max(events) <= 1, 'Binarize input first.'
+
+    # Duration in seconds.
+    if events.ndim == 1:
+        duration = len(events) / 20
+        event_rate = np.sum(events)
+    elif events.ndim == 2:
+        duration = events.shape[1] / 20
+        event_rate = np.sum(events, axis=1)
+    else:
+        raise ValueError('Unknown operation.')
+
+    event_rate = event_rate / duration
+
+    return event_rate
