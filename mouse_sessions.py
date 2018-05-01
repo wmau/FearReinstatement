@@ -41,3 +41,6 @@ def make_session_list(csv_directory):
         dump(session_directories, output)
 
     return session_directories
+
+if __name__ == '__main__':
+    make_session_list('U:\Fear conditioning project_Mosaic2\SessionDirectories')

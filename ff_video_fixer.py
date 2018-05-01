@@ -18,6 +18,7 @@ from helper_functions import find_closest
 
 session_list = load_session_list()
 
+
 def load_session(session_index):
     directory = session_list[session_index]["Location"]
     position_path = path.join(directory, 'FreezeFrame', 'Position.pkl')
@@ -26,6 +27,7 @@ def load_session(session_index):
         FF = load(file)
 
     return FF
+
 
 class FFObj:
     def __init__(self, session_index, stitch=True):
@@ -88,24 +90,24 @@ class FFObj:
         reader = cv2.VideoCapture(self.avi_location)
 
         def onChange(track_bar_value):
-            reader.set(cv2.CAP_PROP_POS_FRAMES,track_bar_value)
-            err,img = reader.read()
-            cv2.imshow('Video',img)
+            reader.set(cv2.CAP_PROP_POS_FRAMES, track_bar_value)
+            err, img = reader.read()
+            cv2.imshow('Video', img)
             pass
 
         cv2.namedWindow('Video')
-        cv2.createTrackbar('Frame 1','Video',0,self.n_frames,onChange)
-        cv2.createTrackbar('Frame 2','Video',0,self.n_frames,onChange)
+        cv2.createTrackbar('Frame 1', 'Video', 0, self.n_frames, onChange)
+        cv2.createTrackbar('Frame 2', 'Video', 0, self.n_frames, onChange)
 
         onChange(0)
         keep_going = True
         while keep_going:
             k = cv2.waitKey()
-            if k==27:
+            if k == 27:
                 keep_going = False
 
-        frame1 = cv2.getTrackbarPos('Frame 1','Video')
-        frame2 = cv2.getTrackbarPos('Frame 2','Video')
+        frame1 = cv2.getTrackbarPos('Frame 1', 'Video')
+        frame2 = cv2.getTrackbarPos('Frame 2', 'Video')
 
         cv2.destroyAllWindows()
 
@@ -144,21 +146,21 @@ class FFObj:
         paste_onto_me.paste(chunk, region)
         self.baseline_frame = color.rgb2gray(np.array(paste_onto_me))
 
-    def get_baseline_frame(self,stitch):
+    def get_baseline_frame(self, stitch):
         """
         Build the baseline frame.
         """
         # Scroll through the frames.
         if stitch:
             print('Define the frames to stitch. Your crop from the top'
-                 ' frame goes onto the bottom frame.')
-            from_frame,to_frame = self.scroll_through_frames()
+                  ' frame goes onto the bottom frame.')
+            from_frame, to_frame = self.scroll_through_frames()
 
             self.stitch_baseline_frame(from_frame, to_frame)
 
         else:
             print('Define the baseline frame on the top trackbar.')
-            frame,_ = self.scroll_through_frames()
+            frame, _ = self.scroll_through_frames()
             self.baseline_frame = color.rgb2gray(self.movie[frame])
 
     def auto_detect_mouse(self, smooth_sigma, threshold):
@@ -177,7 +179,7 @@ class FFObj:
         """
         Match timestamps and position to imaging.
         """
-        _,imaging_t = ca_traces.load_traces(self.session_index)
+        _, imaging_t = ca_traces.load_traces(self.session_index)
         x = np.interp(imaging_t, self.video_t, self.position[:, 0])
         y = np.interp(imaging_t, self.video_t, self.position[:, 1])
         imaging_v = np.interp(imaging_t, self.video_t, self.velocity)
@@ -190,12 +192,12 @@ class FFObj:
             _, start_idx = find_closest(imaging_t,
                                         self.video_t[this_epoch[0]])
             _, end_idx = find_closest(imaging_t,
-                                      self.video_t[this_epoch[1]-1])
+                                      self.video_t[this_epoch[1] - 1])
             imaging_freezing[start_idx:end_idx] = True
 
-        return x,y,imaging_t,imaging_freezing,imaging_v
+        return x, y, imaging_t, imaging_freezing, imaging_v
 
-    def detect_freezing(self,velocity_threshold, min_freeze_duration,
+    def detect_freezing(self, velocity_threshold, min_freeze_duration,
                         plot_freezing):
         """
         Detect freezing epochs.
@@ -206,10 +208,10 @@ class FFObj:
             this scalar.
             plot_freezing: logical, whether you want to see the results.
         """
-        pos_diff = np.diff(self.position, axis=0)                       # For calculating distance.
-        time_diff = np.diff(self.video_t)                               # Time difference.
-        distance = np.hypot(pos_diff[:,0], pos_diff[:,1])               # Displacement.
-        self.velocity = np.concatenate(([0], distance//time_diff))      # Velocity.
+        pos_diff = np.diff(self.position, axis=0)  # For calculating distance.
+        time_diff = np.diff(self.video_t)  # Time difference.
+        distance = np.hypot(pos_diff[:, 0], pos_diff[:, 1])  # Displacement.
+        self.velocity = np.concatenate(([0], distance // time_diff))  # Velocity.
         self.freezing = self.velocity < velocity_threshold
 
         freezing_epochs = self.get_freezing_epochs()
@@ -247,10 +249,10 @@ class FFObj:
 
         # Get the imaging indices for freezing.
         freeze_epochs = np.zeros(epochs.shape, dtype=int)
-        for i,this_epoch in enumerate(epochs):
-            _,start = find_closest(self.imaging_t,self.video_t[this_epoch[0]])
-            _,end = find_closest(self.imaging_t,self.video_t[this_epoch[1]])
-            freeze_epochs[i,:] = [start, end]
+        for i, this_epoch in enumerate(epochs):
+            _, start = find_closest(self.imaging_t, self.video_t[this_epoch[0]])
+            _, end = find_closest(self.imaging_t, self.video_t[this_epoch[1]])
+            freeze_epochs[i, :] = [start, end]
 
         return freeze_epochs
 
@@ -260,14 +262,14 @@ class FFObj:
         print('Define frames where mouse enters the chamber (top) or '
               'exits the chamber (bottom).')
         self.mouse_in_cage_imaging_t = np.zeros(2)
-        frame1,frame2 = self.scroll_through_frames()
+        frame1, frame2 = self.scroll_through_frames()
 
         # Get timestamps.
-        self.mouse_in_cage_imaging_t[0],start = \
+        self.mouse_in_cage_imaging_t[0], start = \
             find_closest(self.imaging_t, self.video_t[frame1])
-        self.mouse_in_cage_imaging_t[1],end = \
-            find_closest(self.imaging_t,self.video_t[frame2])
-        self.mouse_in_cage = np.zeros(self.imaging_t.shape,dtype=bool)
+        self.mouse_in_cage_imaging_t[1], end = \
+            find_closest(self.imaging_t, self.video_t[frame2])
+        self.mouse_in_cage = np.zeros(self.imaging_t.shape, dtype=bool)
         self.mouse_in_cage[start:end] = True
 
     def plot_position(self):
@@ -287,7 +289,7 @@ class FFObj:
                        position=self.position, freezing=self.freezing,
                        titles=titles)
 
-    def process_video(self,smooth_sigma=6, mouse_threshold=0.15,
+    def process_video(self, smooth_sigma=6, mouse_threshold=0.15,
                       velocity_threshold=15, min_freeze_duration=10,
                       plot_freezing=True):
         """
@@ -296,13 +298,14 @@ class FFObj:
         self.auto_detect_mouse(smooth_sigma, mouse_threshold)
         self.detect_freezing(velocity_threshold, min_freeze_duration,
                              plot_freezing)
-        self.x,self.y,self.imaging_t,self.imaging_freezing, \
-            self.imaging_velocity = self.interpolate()
+        self.x, self.y, self.imaging_t, self.imaging_freezing, \
+        self.imaging_v = self.interpolate()
         self.get_mouse_in_cage_epoch()
 
     def save_data(self):
-        with open(self.location,'wb') as output:
-            dump(self,output)
+        with open(self.location, 'wb') as output:
+            dump(self, output)
+
 
 class FrameSelector:
     """
@@ -463,9 +466,9 @@ class MouseDetector:
         return detector
 
     def detect_mouse(self, threshold):
-        d_movie = self.make_difference_movie()                      # Make difference movie.
-        thresh_movie = self.threshold_movie(d_movie, threshold)     # Make thresholded movie.
-        detector = self.build_blob_detector()                       # Build blob detector.
+        d_movie = self.make_difference_movie()  # Make difference movie.
+        thresh_movie = self.threshold_movie(d_movie, threshold)  # Make thresholded movie.
+        detector = self.build_blob_detector()  # Build blob detector.
 
         # Detect blobs on each frame.
         position = np.zeros([self.n_frames, 2])

@@ -14,15 +14,21 @@ from scipy.stats import zscore
 session_list = load_session_list()
 
 
-def PCA_session(session_index, bin_length=1):
+def PCA_session(session_index, bin_length=1, dtype='trace'):
     session = FF.load_session(session_index)
 
     # Get accepted neurons.
-    traces, t = ca_traces.load_traces(session_index)
-    traces = zscore(traces, axis=1)
-    # traces = ca_events.make_event_matrix(session_index)       # If you want events (not traces).
-    scaler = StandardScaler()
-    traces = scaler.fit_transform(traces)
+    if dtype == 'trace':
+        traces, t = ca_traces.load_traces(session_index)
+        traces = zscore(traces, axis=1)
+
+        scaler = StandardScaler()
+        traces = scaler.fit_transform(traces)
+    elif dtype == 'event':
+        traces, t = ca_events.load_events(session_index)
+    else:
+        raise ValueError('Wrong dtype input.')
+
     n_neurons = len(traces)
 
     # Trim the traces to only include instances where mouse is in the chamber.
@@ -57,8 +63,6 @@ def PCA_session(session_index, bin_length=1):
     s = ax.scatter(Y[:, 0], Y[:, 1], Y[:, 2], c=binned_freezing)
     fig.show()
 
-    pass
-
 
 if __name__ == '__main__':
-    PCA_session(0)
+    PCA_session(10,'event')
