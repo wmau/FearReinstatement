@@ -10,7 +10,8 @@ from sklearn.model_selection import train_test_split, StratifiedKFold, \
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-from cell_reg import load_cellreg_results, find_match_map_index
+from cell_reg import load_cellreg_results, find_match_map_index, \
+    find_cell_in_map
 from random import randint
 import calcium_events as ca_events
 
@@ -21,11 +22,11 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
     session = ff.load_session(session_index)
 
     # Get accepted neurons.
-    predictor_var, t = ca_traces.load_traces(session_index)
     if predictor == 'traces':
+        predictor_var, t = ca_traces.load_traces(session_index)
         predictor_var = zscore(predictor_var, axis=1)
     elif predictor == 'events':
-        predictor_var = ca_events.make_event_matrix(session_index)
+        predictor_var, t = ca_events.load_events(session_index)
     else:
         raise ValueError('Predictor incorrectly defined.')
 
@@ -89,7 +90,8 @@ def NB_session_permutation(X, Y):
 
 
 def preprocess_NB_cross_session(train_session, test_session,
-                                bin_length=2, predictor='traces'):
+                                bin_length=2, predictor='traces',
+                                neurons=None):
     # Make sure the data comes from the same mouse.
     mouse = session_list[train_session]["Animal"]
     assert mouse == session_list[test_session]["Animal"], \
@@ -106,6 +108,10 @@ def preprocess_NB_cross_session(train_session, test_session,
 
     idx = find_match_map_index([train_session, test_session])
 
+    if neurons is not None:
+        global_cell_idx = find_cell_in_map(match_map, idx[0], neurons)
+        match_map = match_map[global_cell_idx,:]
+
     trimmed_map = match_map[:, [idx[0], idx[1]]]
     detected_both_days = (trimmed_map > -1).all(axis=1)
     trimmed_map = trimmed_map[detected_both_days, :]
@@ -117,7 +123,7 @@ def preprocess_NB_cross_session(train_session, test_session,
 
 
 def cross_session_NB(train_session, test_session, bin_length=2,
-                     shuffle=False):
+                     shuffle=False, classifier_fx=MultinomialNB):
     X_train, X_test, y_train, y_test = \
         preprocess_NB_cross_session(train_session, test_session,
                                     bin_length=bin_length)
@@ -125,7 +131,7 @@ def cross_session_NB(train_session, test_session, bin_length=2,
     if shuffle:
         y_train = np.random.permutation(y_train)
 
-    classifier = make_pipeline(StandardScaler(), MultinomialNB())
+    classifier = make_pipeline(StandardScaler(), classifier_fx)
     classifier.fit(X_train, y_train)
     predict_test = classifier.predict(X_test)
 
@@ -135,11 +141,12 @@ def cross_session_NB(train_session, test_session, bin_length=2,
 
 
 def cross_session_NB2(train_session, test_session, bin_length=2,
-                      predictor='traces'):
+                      predictor='traces', neurons=None):
     X_train, X_test, y_train, y_test = \
         preprocess_NB_cross_session(train_session, test_session,
                                     bin_length=bin_length,
-                                    predictor=predictor)
+                                    predictor=predictor,
+                                    neurons=neurons)
 
     X = np.concatenate((X_train, X_test))
     y = y_train + y_test
@@ -159,13 +166,14 @@ def cross_session_NB2(train_session, test_session, bin_length=2,
 
     score, permutation_scores, p_value = \
         permutation_test_score(classifier, X, y, scoring='accuracy',
-                               groups=groups, cv=cv, n_permutations=500,
+                               groups=groups, cv=cv, n_permutations=1000,
                                n_jobs=1)
 
     return score, permutation_scores, p_value
 
 
 if __name__ == '__main__':
+    from single_cell_analyses.footshock import ShockSequence
     # X, Y = preprocess_NB(0)
     # score, permutation_scores, p_value = NB_session_permutation(X, Y)
     # accuracy = NB_session(X, Y)
@@ -182,15 +190,18 @@ if __name__ == '__main__':
     pval_kerberos_events = []
     score_kerberos_traces = []
     pval_kerberos_traces = []
+    S = ShockSequence(s1)
     for s in s2:
         score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='events')
+            cross_session_NB2(s1, s, bin_length=2, predictor='events',
+                              neurons=S.shock_modulated_cells)
 
         score_kerberos_events.append(score)
         pval_kerberos_events.append(p_value)
 
         score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='traces')
+            cross_session_NB2(s1, s, bin_length=2, predictor='traces',
+                              neurons=S.shock_modulated_cells)
 
         score_kerberos_traces.append(score)
         pval_kerberos_traces.append(p_value)
@@ -202,15 +213,18 @@ if __name__ == '__main__':
     pval_nix_events = []
     score_nix_traces = []
     pval_nix_traces = []
+    S = ShockSequence(s1)
     for s in s2:
         score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='events')
+            cross_session_NB2(s1, s, bin_length=2, predictor='events',
+                              neurons=S.shock_modulated_cells)
 
         score_nix_events.append(score)
         pval_nix_events.append(p_value)
 
         score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='traces')
+            cross_session_NB2(s1, s, bin_length=2, predictor='traces',
+                              neurons=S.shock_modulated_cells)
 
         score_nix_traces.append(score)
         pval_nix_traces.append(p_value)
@@ -218,21 +232,24 @@ if __name__ == '__main__':
     s1 = 10
     s2 = [11, 12, 14]
 
-    score_atlas_events = []
-    pval_atlas_events = []
-    score_atlas_traces = []
-    pval_atlas_traces = []
+    score_fenrir_events = []
+    pval_fenrir_events = []
+    score_fenrir_traces = []
+    pval_fenrir_traces = []
+    S = ShockSequence(s1)
     for s in s2:
         score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='events')
+            cross_session_NB2(s1, s, bin_length=2, predictor='events',
+                              neurons=S.shock_modulated_cells)
 
-        score_atlas_events.append(score)
-        pval_atlas_events.append(p_value)
+        score_fenrir_events.append(score)
+        pval_fenrir_events.append(p_value)
 
         score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='traces')
+            cross_session_NB2(s1, s, bin_length=2, predictor='traces',
+                              neurons=S.shock_modulated_cells)
 
-        score_atlas_traces.append(score)
-        pval_atlas_traces.append(p_value)
+        score_fenrir_traces.append(score)
+        pval_fenrir_traces.append(p_value)
 
     pass

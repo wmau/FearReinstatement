@@ -12,7 +12,7 @@ session_list = load_session_list()
 
 def find_most_active(session_index, percentile):
     session = ff.load_session(session_index)
-    events = ca_events.make_event_matrix(session_index)
+    events, _ = ca_events.load_events(session_index)
     events = d_pp.trim_session(events, session.mouse_in_cage)
     events = events > 0
 
@@ -58,4 +58,10 @@ def find_most_active_overlap(session_1, session_2, percentile=50):
 
 
 if __name__ == '__main__':
-    find_most_active_overlap(10, 11, percentile=0)
+    percentile = 50
+    p = []
+    p.append(find_most_active_overlap(10, 11, percentile=percentile))
+    p.append(find_most_active_overlap(10, 12, percentile=percentile))
+    p.append(find_most_active_overlap(10, 14, percentile=percentile))
+
+    pass

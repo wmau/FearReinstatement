@@ -76,7 +76,7 @@ def plot_sequence_over_days(FC_session, test_session):
     pass
 
 class ShockSequence:
-    def __init__(self, session_index, window=[-1, 15]):
+    def __init__(self, session_index, window=[-1, 10]):
         self.session_index = session_index
         self.frame_rate = 20
         window.sort()
@@ -93,8 +93,8 @@ class ShockSequence:
         traces, self.t = \
             ca_traces.load_traces(session_index)
 
-        self.events = ca_events.make_event_matrix(session_index)
-        self.traces = zscore(traces, axis=0)
+        self.events, _ = ca_events.load_events(session_index)
+        self.traces = zscore(traces, axis=1)
         self.n_neurons = len(traces)
 
         try:
@@ -216,16 +216,22 @@ class ShockSequence:
 
         return order
 
-    def plot_sequence(self):
-        # Convert to array. Then normalize.
-        tuning_curves = np.asarray(self.tuning_curves)[self.shock_modulated_cells]
-        tuning_curves = normalize(tuning_curves, norm='max')
+    def plot_sequence(self, cells=None, order=None):
+        if cells is None:
+            cells = self.shock_modulated_cells
 
-        n_modulated_cells = len(self.shock_modulated_cells)
+        if order is None:
+            order = self.order
+
+        # Convert to array. Then normalize.
+        tuning_curves = np.asarray(self.tuning_curves)[cells].T
+        tuning_curves = ((tuning_curves - tuning_curves.min(0)) / tuning_curves.ptp(0)).T
+
+        n_modulated_cells = len(cells)
 
         # Plot.
         plt.figure(figsize=(4, 5))
-        plt.imshow(tuning_curves[self.order],
+        plt.imshow(tuning_curves[order],
                    extent=[self.ref_time[0], self.ref_time[-1],
                            n_modulated_cells, 0])
         plt.axis('tight')
@@ -296,6 +302,11 @@ class ShockXCorr:
 
 
 if __name__ == '__main__':
+    from sequences.seqNMF_data import seqNMF
+    FC_Shock = ShockSequence(0)
+    FC_NMF = seqNMF(0)
+    FC_Shock.plot_sequence(cells=FC_NMF.sequence_cells[1], order=FC_NMF.order[1])
+
     plot_sequence_over_days(0,1)
 
     pass

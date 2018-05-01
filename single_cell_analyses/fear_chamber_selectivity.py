@@ -51,7 +51,7 @@ session_list = load_session_list()
 #     return significant_neurons
 
 def detect_ramping_cells(session_index, bin_length=300):
-    events = ca_events.make_event_matrix(session_index)
+    events = ca_events.load_events(session_index)
     session = ff.load_session(session_index)
 
     n_neurons = len(events)

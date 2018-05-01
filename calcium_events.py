@@ -15,11 +15,13 @@ from helper_functions import find_closest
 import numpy as np
 from os import path
 from pickle import load, dump
+import data_preprocessing as d_pp
+import scipy.io as sio
 
 session_list = load_session_list()
 
 
-def load_events(session_index):
+def load_event_times(session_index):
     """
     Load calcium events and save to disk if not already saved.
 
@@ -33,6 +35,21 @@ def load_events(session_index):
     return data.event_times, data.event_values
 
 
+def save_events(session_index):
+    from ff_video_fixer import load_session
+
+    entire_session_events, _ = load_events(session_index)
+    session = load_session(session_index)
+    events = d_pp.trim_session(entire_session_events,
+                               session.mouse_in_cage)
+
+    directory = session_list[session_index]["Location"]
+    file = path.join(directory, 'Events.mat')
+
+    sio.savemat(file,{'events': events,
+                      'events_all': entire_session_events})
+
+
 def plot_events(session_index, neurons):
     """
         Plot events as a scatter plot.
@@ -43,7 +60,7 @@ def plot_events(session_index, neurons):
             f: ScrollPlot class.
     """
     # Load events.
-    event_times, event_values = load_events(session_index)
+    event_times, event_values = load_event_times(session_index)
 
     # Plot and scroll through calcium events.
     titles = neuron_number_title(neurons)
@@ -63,7 +80,7 @@ def overlay_events(session_index, neurons):
         f: ScrollPlot class.
     """
     # Load events and traces.
-    event_times, event_values = load_events(session_index)
+    event_times, event_values = load_event_times(session_index)
     traces, t = ca_traces.load_traces(session_index)
 
     # Plot and scroll.
@@ -76,14 +93,17 @@ def overlay_events(session_index, neurons):
     return f
 
 
-def make_event_matrix(session_index):
+def load_events(session_index):
     directory = session_list[session_index]["Location"]
     file_path = path.join(directory, "EventMatrix.pkl")
     try:
         with open(file_path, 'rb') as file:
             events = load(file)
+
+        _, t = ca_traces.load_traces(session_index)
+
     except:
-        event_times, event_values = load_events(session_index)
+        event_times, event_values = load_event_times(session_index)
 
         traces, t = ca_traces.load_traces(session_index)
 
@@ -97,7 +117,7 @@ def make_event_matrix(session_index):
         with open(file_path, 'wb') as file:
             dump(events, file, protocol=4)
 
-    return events
+    return events, t
 
 if __name__ == '__main__':
     overlay_events(0,[1,2,3,4,5])
