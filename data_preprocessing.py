@@ -27,6 +27,9 @@ def make_bins(data, samples_per_bin):
 
 
 def bin_time_series(data, bins):
-    binned_data = np.split(data, bins)
+    if data.ndim == 1:
+        binned_data = np.split(data, bins)
+    elif data.ndim == 2:
+        binned_data = np.split(data, bins, axis=1)
 
     return binned_data
