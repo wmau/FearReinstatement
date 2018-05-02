@@ -80,10 +80,10 @@ class ScrollPlot:
 
         # Run the plotting function.
         self.plot_func(self)
+        self.apply_labels()
 
         # Draw.
         self.fig.canvas.draw()
-        self.apply_labels()
 
         if event.key == 'escape':
             plt.close(self.fig)
