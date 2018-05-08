@@ -1,7 +1,6 @@
 import numpy as np
 from itertools import groupby
 
-
 def find_closest(array, value):
     value = float(value)
     idx = (np.abs(array - value)).argmin()
@@ -15,11 +14,11 @@ def ismember(A, B):
     indices in B for every value of A.
     """
 
-    A_in_B = np.in1d(A, B)
+    B_in_A = np.in1d(B, A)
 
     A = list(A)
     try:
-        B_idx = np.zeros(len(B), dtype=int)
+        B_idx = np.zeros(len(B),dtype=int)
         for i,element in enumerate(B):
             try:
                 B_idx[i] = int(A.index(element))
@@ -28,7 +27,7 @@ def ismember(A, B):
     except:
         B_idx = int(A.index(B))
 
-    return A_in_B, B_idx
+    return B_in_A, B_idx
 
 
 def find_dict_index(list, key, value):
@@ -73,3 +72,4 @@ def get_event_rate(events):
     event_rate = event_rate / duration
 
     return event_rate
+
