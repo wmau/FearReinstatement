@@ -27,7 +27,7 @@ def plot_ordered_cells(session_index, cells, order=None, dtype='event'):
         data, t = ca_traces.load_traces(session_index)
         data = zscore(data, axis=1)
     elif dtype == 'event':
-        data,t  = ca_events.load_events(session_index)
+        data, t  = ca_events.load_events(session_index)
         data[data > 0] = 1
     else:
         raise ValueError('Wrong dtype value.')
@@ -168,6 +168,6 @@ def plot_sequences_across_days(session_1, session_2, dtype='event',
 
 
 if __name__ == '__main__':
-    from single_cell_analyses.footshock import ShockSequence
-    FC = ShockSequence(0)
-    plot_ordered_cells_across_days(0, 1, FC.shock_modulated_cells, FC.order)
+    from single_cell_analyses.freezing_selectivity import FreezingCellFilter
+    cells, p = FreezingCellFilter(5, 'trace').get_freezing_cells()
+    plot_ordered_cells(5, cells)

@@ -58,10 +58,25 @@ def find_most_active_overlap(session_1, session_2, percentile=50):
 
 
 if __name__ == '__main__':
-    percentile = 50
-    p = []
-    p.append(find_most_active_overlap(10, 11, percentile=percentile))
-    p.append(find_most_active_overlap(10, 12, percentile=percentile))
-    p.append(find_most_active_overlap(10, 14, percentile=percentile))
+    import matplotlib.pyplot as plt
+
+    fc_sessions = [0, 5, 10]
+    other_sessions = [[1, 2, 4], [6, 7, 9], [11, 12,14]]
+    percentiles = [20, 40, 60, 80, 90, 95]
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for i, percentile in enumerate(percentiles):
+        fig.add_subplot(2,3,i+1)
+        p = np.zeros((3,3))
+        for animal, fc in enumerate(fc_sessions):
+            for session_num, session in enumerate(other_sessions[animal]):
+                p[animal, session_num] = find_most_active_overlap(fc, session,
+                                                                  percentile=percentile)
+
+        plt.plot(['Ext1', 'Ext2', 'Recall'], p[0:2].T, color='k')
+        plt.plot(['Ext1', 'Ext2', 'Recall'], p[-1], color='r')
+        plt.title('Percentile = ' + str(percentile))
+
+    ax.set_ylabel('Overlap with most active cells on fear conditioning day')
 
     pass
