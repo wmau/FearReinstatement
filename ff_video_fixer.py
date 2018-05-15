@@ -15,6 +15,7 @@ import plot_functions as plot_funcs
 from scipy.ndimage.filters import gaussian_filter as gfilt
 import calcium_traces as ca_traces
 from helper_functions import find_closest
+import msvcrt as m
 
 session_list = load_session_list()
 
@@ -312,7 +313,7 @@ class FFObj:
                        titles=titles)
 
     def process_video(self, smooth_sigma=6, mouse_threshold=0.15,
-                      velocity_threshold=7, min_freeze_duration=10,
+                      velocity_threshold=7, min_freeze_duration=5,
                       plot_freezing=True, manual_correct=True):
         """
         Main function for detecting mouse and correcting video.
@@ -322,10 +323,13 @@ class FFObj:
         if manual_correct:
             self.correct_position()
 
+            while plt.get_fignums():
+                plt.waitforbuttonpress()
+
         self.detect_freezing(velocity_threshold, min_freeze_duration,
                              plot_freezing)
         self.x, self.y, self.imaging_t, self.imaging_freezing, \
-        self.imaging_v = self.interpolate()
+            self.imaging_v = self.interpolate()
         self.get_mouse_in_cage_epoch()
 
     def save_data(self):
