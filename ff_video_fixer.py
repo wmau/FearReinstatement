@@ -29,6 +29,16 @@ def load_session(session_index):
     return FF
 
 
+def load_movie(session_index):
+    directory = session_list[session_index]["Location"]
+    position_path = path.join(directory, 'FreezeFrame', 'Movie.pkl')
+
+    with open(position_path, 'rb') as file:
+        FF = load(file)
+
+    return FF
+
+
 class FFObj:
     def __init__(self, session_index, stitch=True):
         self.session_index = session_index
@@ -216,13 +226,13 @@ class FFObj:
 
         freezing_epochs = self.get_freezing_epochs()
 
-        # Get duration of freezing in frames.
-        freezing_duration = np.diff(freezing_epochs)
-
         # If any freezing epochs were less than ~3 seconds long, get rid of
         # them.
         for this_epoch in freezing_epochs:
-            if np.diff(this_epoch) < min_freeze_duration:
+            start = this_epoch[0]
+            stop = this_epoch[1]
+            if self.video_t[stop] - self.video_t[start] < \
+                    min_freeze_duration:
                 self.freezing[this_epoch[0]:this_epoch[1]] = False
 
         if plot_freezing:
@@ -276,9 +286,21 @@ class FFObj:
         # Plot frame and position of mouse.
         titles = ["Frame " + str(n) for n in range(self.n_frames)]
 
-        f = ScrollPlot(plot_funcs.display_frame_and_position,
-                       movie=self.movie, n_frames=self.n_frames, position=self.position,
-                       titles=titles)
+        self.f = ScrollPlot(plot_funcs.display_frame_and_position,
+                            movie=self.movie, n_frames=self.n_frames,
+                            position=self.position, titles=titles)
+
+
+    def correct_position(self):
+        self.plot_position()
+        self.f.fig.canvas.mpl_connect('button_press_event',
+                                      self.on_press)
+
+    def on_press(self, event):
+        self.position[self.f.current_position] = \
+            (event.xdata, event.ydata)
+        self.f.fig.axes[0].plot(event.xdata, event.ydata, 'go')
+        self.f.fig.canvas.draw()
 
     def plot_freezing(self):
         # Plot frame and position of mouse. Blue dots indicate freezing epochs.
@@ -290,12 +312,16 @@ class FFObj:
                        titles=titles)
 
     def process_video(self, smooth_sigma=6, mouse_threshold=0.15,
-                      velocity_threshold=15, min_freeze_duration=10,
-                      plot_freezing=True):
+                      velocity_threshold=7, min_freeze_duration=10,
+                      plot_freezing=True, manual_correct=True):
         """
         Main function for detecting mouse and correcting video.
         """
         self.auto_detect_mouse(smooth_sigma, mouse_threshold)
+
+        if manual_correct:
+            self.correct_position()
+
         self.detect_freezing(velocity_threshold, min_freeze_duration,
                              plot_freezing)
         self.x, self.y, self.imaging_t, self.imaging_freezing, \
@@ -303,6 +329,14 @@ class FFObj:
         self.get_mouse_in_cage_epoch()
 
     def save_data(self):
+        directory, _ = path.split(self.avi_location)
+        movie_file = path.join(directory, 'Movie.pkl')
+
+        with open(movie_file, 'wb') as output:
+            dump(self, output)
+
+        del self.movie
+
         with open(self.location, 'wb') as output:
             dump(self, output)
 
@@ -490,6 +524,6 @@ class MouseDetector:
 
 
 if __name__ == '__main__':
-    FF = FFObj(1)
-    FF.process_video()
-    pass
+    FF = load_movie(1)
+    f = FF.plot_position()
+    FF.correct_position(f)
