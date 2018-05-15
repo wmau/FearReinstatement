@@ -1,4 +1,3 @@
-import cell_stats
 from os import path
 from pandas import read_csv
 from csv import DictReader
@@ -6,8 +5,16 @@ from pickle import dump, load
 from numpy import delete,array
 from session_directory import load_session_list
 import numpy as np
+from glob import glob
 
 session_list = load_session_list()
+
+def get_number_of_ICs(session_index):
+    directory = path.join(session_list[session_index]["Location"],'ROIs')
+    ROIs = glob(path.join(directory,'ROIs_C*.*'))
+
+    n_ICs = len(ROIs)
+    return n_ICs
 
 
 class CellData:
@@ -35,7 +42,7 @@ class CellData:
             # Initialize.
             self.traces = []
             self.t = []
-            self.n_ICs = cell_stats.get_number_of_ICs(session_number)
+            self.n_ICs = get_number_of_ICs(session_number)
             self.accepted = [False] * self.n_ICs
 
             # Compile.

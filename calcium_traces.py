@@ -12,7 +12,6 @@ from os import path
 from pickle import load
 import plot_functions as plot_funcs
 import ff_video_fixer as FF
-import cell_stats
 import numpy as np
 from cell_reg import load_cellreg_results, find_match_map_index
 from session_directory import find_mouse_sessions

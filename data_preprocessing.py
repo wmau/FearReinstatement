@@ -24,7 +24,7 @@ def make_bins(data, samples_per_bin):
 
     bins = np.arange(samples_per_bin, length, samples_per_bin)
 
-    return bins
+    return bins.astype(int)
 
 
 def bin_time_series(data, bins):
