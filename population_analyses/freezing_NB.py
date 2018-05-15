@@ -6,7 +6,7 @@ from scipy.stats import zscore
 from session_directory import load_session_list
 from sklearn import metrics
 from sklearn.model_selection import train_test_split, StratifiedKFold, \
-    permutation_test_score, GroupKFold
+    permutation_test_score, LeaveOneGroupOut
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -46,10 +46,16 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
 
     # Bin the imaging data.
     X = np.zeros([n_samples, n_neurons])
-    for n, trace in enumerate(predictor_var):
-        binned_activity = d_pp.bin_time_series(trace, bins)
-        # X[:, n] = [np.mean(chunk) for chunk in binned_activity]
-        X[:, n] = [np.sum(chunk > 0) for chunk in binned_activity]
+
+    if predictor == 'traces':
+        for n, trace in enumerate(predictor_var):
+            binned_activity = d_pp.bin_time_series(trace, bins)
+            X[:, n] = [np.mean(chunk) for chunk in binned_activity]
+
+    elif predictor == 'events':
+        for n, trace in enumerate(predictor_var):
+            binned_activity = d_pp.bin_time_series(trace, bins)
+            X[:, n] = [np.sum(chunk > 0) for chunk in binned_activity]
 
     # Bin freezing vector.
     binned_freezing = d_pp.bin_time_series(freezing, bins)
@@ -122,16 +128,11 @@ def preprocess_NB_cross_session(train_session, test_session,
     return X_train, X_test, y_train, y_test
 
 
-def cross_session_NB(train_session, test_session, bin_length=2,
-                     shuffle=False, classifier_fx=MultinomialNB):
-    X_train, X_test, y_train, y_test = \
-        preprocess_NB_cross_session(train_session, test_session,
-                                    bin_length=bin_length)
 
-    if shuffle:
-        y_train = np.random.permutation(y_train)
+def fit_cross_session_NB(X_train, X_test, y_train, y_test,
+                         classifier=
+                         make_pipeline(StandardScaler(), GaussianNB())):
 
-    classifier = make_pipeline(StandardScaler(), classifier_fx)
     classifier.fit(X_train, y_train)
     predict_test = classifier.predict(X_test)
 
@@ -139,6 +140,35 @@ def cross_session_NB(train_session, test_session, bin_length=2,
 
     return accuracy
 
+
+def cross_session_NB(train_session, test_session, bin_length=2,
+                     predictor='traces', neurons=None, I=1000):
+
+    X_train, X_test, y_train, y_test = \
+        preprocess_NB_cross_session(train_session, test_session,
+                                    bin_length=bin_length,
+                                    predictor=predictor,
+                                    neurons=neurons)
+
+    if predictor == 'traces':
+        classifier = make_pipeline(StandardScaler(), GaussianNB())
+    elif predictor == 'events':
+        classifier = MultinomialNB()
+
+    score = fit_cross_session_NB(X_train, X_test, y_train, y_test,
+                                 classifier=classifier)
+
+    permutation_scores = np.zeros((I))
+    for i in range(I):
+        y_shuffle = np.random.permutation(y_train)
+
+        permutation_scores[i] = fit_cross_session_NB(X_train, X_test,
+                                                     y_shuffle, y_test,
+                                                     classifier=classifier)
+
+    p_value = np.sum(score < permutation_scores)/I
+
+    return score, permutation_scores, p_value
 
 def cross_session_NB2(train_session, test_session, bin_length=2,
                       predictor='traces', neurons=None):
@@ -155,7 +185,7 @@ def cross_session_NB2(train_session, test_session, bin_length=2,
     test_label = np.ones(len(y_test), dtype=int)
     groups = np.concatenate((train_label, test_label))
 
-    cv = GroupKFold(n_splits=2)
+    cv = LeaveOneGroupOut()
 
     if predictor == 'traces':
         classifier = make_pipeline(StandardScaler(), GaussianNB())
@@ -173,12 +203,13 @@ def cross_session_NB2(train_session, test_session, bin_length=2,
 
 
 if __name__ == '__main__':
-    from single_cell_analyses.footshock import ShockSequence
+    #from single_cell_analyses.footshock import ShockSequence
+    bin_length = 1
     # X, Y = preprocess_NB(0)
     # score, permutation_scores, p_value = NB_session_permutation(X, Y)
     # accuracy = NB_session(X, Y)
-    s1 = 0
-    s2 = [1,2,4]
+    session_1 = [0, 5, 10, 15]
+    session_2 = [[1, 2, 4], [6, 7, 9], [11, 12, 14], [16, 17, 19]]
     # shuffled = []
     # for i in np.arange(100):
     #     accuracy = cross_session_NB(s1,s2,shuffle=True)
@@ -186,70 +217,26 @@ if __name__ == '__main__':
     #
     # accuracy = cross_session_NB(s1,s2)
 
-    score_kerberos_events = []
-    pval_kerberos_events = []
-    score_kerberos_traces = []
-    pval_kerberos_traces = []
-    S = ShockSequence(s1)
-    for s in s2:
-        score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='events',
-                              neurons=S.shock_modulated_cells)
+    scores_events = np.zeros((len(session_1),3))
+    pvals_events = np.zeros((len(session_1),3))
+    scores_traces = np.zeros((len(session_1),3))
+    pvals_traces = np.zeros((len(session_1),3))
+    #S = ShockSequence(s1)
 
-        score_kerberos_events.append(score)
-        pval_kerberos_events.append(p_value)
+    for i, fc in enumerate(session_1):
+        for j, ext in enumerate(session_2[i]):
+            score, _, p_value = \
+            cross_session_NB(fc, ext, bin_length=bin_length, predictor='events',
+                              )
 
-        score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='traces',
-                              neurons=S.shock_modulated_cells)
+            scores_events[i, j] = score
+            pvals_events[i, j] = p_value
 
-        score_kerberos_traces.append(score)
-        pval_kerberos_traces.append(p_value)
+            score, _, p_value = \
+            cross_session_NB(fc, ext, bin_length=bin_length, predictor='traces',
+                              )
 
-    s1 = 5
-    s2 = [6, 7, 9]
-
-    score_nix_events = []
-    pval_nix_events = []
-    score_nix_traces = []
-    pval_nix_traces = []
-    S = ShockSequence(s1)
-    for s in s2:
-        score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='events',
-                              neurons=S.shock_modulated_cells)
-
-        score_nix_events.append(score)
-        pval_nix_events.append(p_value)
-
-        score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='traces',
-                              neurons=S.shock_modulated_cells)
-
-        score_nix_traces.append(score)
-        pval_nix_traces.append(p_value)
-
-    s1 = 10
-    s2 = [11, 12, 14]
-
-    score_fenrir_events = []
-    pval_fenrir_events = []
-    score_fenrir_traces = []
-    pval_fenrir_traces = []
-    S = ShockSequence(s1)
-    for s in s2:
-        score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='events',
-                              neurons=S.shock_modulated_cells)
-
-        score_fenrir_events.append(score)
-        pval_fenrir_events.append(p_value)
-
-        score, permutation_scores, p_value = \
-            cross_session_NB2(s1, s, bin_length=2, predictor='traces',
-                              neurons=S.shock_modulated_cells)
-
-        score_fenrir_traces.append(score)
-        pval_fenrir_traces.append(p_value)
+            scores_traces[i, j] = score
+            pvals_traces[i, j] = p_value
 
     pass
