@@ -36,7 +36,7 @@ def compute_percent_freezing(session_index, bin_length=100, plot_flag=False):
 
     return percent_freezing, t_binned
 
-def plot_freezing(mouse, bin_length=100):
+def plot_freezing_percentages(mouse, bin_length=100):
     session_idx, _ = find_mouse_sessions(mouse)
     del session_idx[3]
 
@@ -49,6 +49,22 @@ def plot_freezing(mouse, bin_length=100):
         ax[i].set_title(titles[i])
 
     ax[0].set_ylabel('% freezing')
+
+def plot_freezing(session_index):
+    session = load_ff(session_index)
+
+    t = d_pp.trim_session(session.imaging_t, session.mouse_in_cage)
+    t-= min(t)
+    v = d_pp.trim_session(session.imaging_v, session.mouse_in_cage)
+    freezing = d_pp.trim_session(session.imaging_freezing,
+                                 session.mouse_in_cage)
+
+    fig, velocity_plot = plt.subplots()
+    plt.plot(t, v, 'k')
+    velocity_plot.set_ylabel('Velocity', color='k')
+    velocity_plot.fill_between(t, 0, v.max(), freezing,
+                               facecolor='r')
+
 
 if __name__ == '__main__':
     plot_freezing('Kerberos')
