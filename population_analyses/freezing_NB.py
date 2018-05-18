@@ -11,7 +11,7 @@ from sklearn.naive_bayes import GaussianNB, MultinomialNB
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from cell_reg import load_cellreg_results, find_match_map_index, \
-    find_cell_in_map
+    find_cell_in_map, trim_match_map
 from random import randint
 import calcium_events as ca_events
 
@@ -27,6 +27,7 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
         predictor_var = zscore(predictor_var, axis=1)
     elif predictor == 'events':
         predictor_var, t = ca_events.load_events(session_index)
+        predictor_var[predictor_var > 0] = 1
     else:
         raise ValueError('Predictor incorrectly defined.')
 
@@ -42,24 +43,21 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
     # Define bin limits.
     samples_per_bin = bin_length * 20
     bins = d_pp.make_bins(t, samples_per_bin)
-    n_samples = len(bins) + 1
-
-    # Bin the imaging data.
-    X = np.zeros([n_samples, n_neurons])
+    binned_activity = d_pp.bin_time_series(predictor_var, bins)
 
     if predictor == 'traces':
-        for n, trace in enumerate(predictor_var):
-            binned_activity = d_pp.bin_time_series(trace, bins)
-            X[:, n] = [np.mean(chunk) for chunk in binned_activity]
+        X = np.mean(np.asarray(binned_activity[0:-1]),axis=2)
+        X = np.append(X, np.mean(binned_activity[-1],axis=1)[None, :],
+                      axis=0)
 
     elif predictor == 'events':
-        for n, trace in enumerate(predictor_var):
-            binned_activity = d_pp.bin_time_series(trace, bins)
-            X[:, n] = [np.sum(chunk > 0) for chunk in binned_activity]
+        X = np.sum(np.asarray(binned_activity[0:-1]),axis=2)
+        X = np.append(X, np.sum(binned_activity[-1],axis=1)[None, :],
+                      axis=0)
 
     # Bin freezing vector.
     binned_freezing = d_pp.bin_time_series(freezing, bins)
-    Y = [i.all() for i in binned_freezing]
+    Y = [i.any() for i in binned_freezing]
 
     return X, Y
 
@@ -210,6 +208,8 @@ if __name__ == '__main__':
     # accuracy = NB_session(X, Y)
     session_1 = [0, 5, 10, 15]
     session_2 = [[1, 2, 4], [6, 7, 9], [11, 12, 14], [16, 17, 19]]
+    all_sessions = [[0, 1, 2, 4], [5, 6, 7, 9], [10, 11, 12, 14],
+                    [15, 16, 17, 19]]
     # shuffled = []
     # for i in np.arange(100):
     #     accuracy = cross_session_NB(s1,s2,shuffle=True)
@@ -224,17 +224,20 @@ if __name__ == '__main__':
     #S = ShockSequence(s1)
 
     for i, fc in enumerate(session_1):
+        match_map = load_cellreg_results(session_list[fc]['Animal'])
+        trimmed = trim_match_map(match_map,all_sessions[i])
+        neurons = trimmed[:,0]
         for j, ext in enumerate(session_2[i]):
             score, _, p_value = \
             cross_session_NB(fc, ext, bin_length=bin_length, predictor='events',
-                              )
+                              neurons=neurons)
 
             scores_events[i, j] = score
             pvals_events[i, j] = p_value
 
             score, _, p_value = \
             cross_session_NB(fc, ext, bin_length=bin_length, predictor='traces',
-                              )
+                             neurons=neurons)
 
             scores_traces[i, j] = score
             pvals_traces[i, j] = p_value
