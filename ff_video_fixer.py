@@ -283,17 +283,18 @@ class FFObj:
         self.mouse_in_cage = np.zeros(self.imaging_t.shape, dtype=bool)
         self.mouse_in_cage[start:end] = True
 
-    def plot_position(self):
+    def plot_position(self, current_position=0):
         # Plot frame and position of mouse.
         titles = ["Frame " + str(n) for n in range(self.n_frames)]
 
         self.f = ScrollPlot(plot_funcs.display_frame_and_position,
+                            current_position=current_position,
                             movie=self.movie, n_frames=self.n_frames,
                             position=self.position, titles=titles)
 
 
-    def correct_position(self):
-        self.plot_position()
+    def correct_position(self, current_position=0):
+        self.plot_position(current_position)
         self.f.fig.canvas.mpl_connect('button_press_event',
                                       self.on_press)
 

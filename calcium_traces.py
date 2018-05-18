@@ -11,7 +11,7 @@ from session_directory import load_session_list
 from os import path
 from pickle import load
 import plot_functions as plot_funcs
-import ff_video_fixer as FF
+import ff_video_fixer as ff
 import numpy as np
 from cell_reg import load_cellreg_results, find_match_map_index
 from session_directory import find_mouse_sessions
@@ -80,7 +80,7 @@ def plot_traces(session_index, neurons):
 
 def plot_freezing_traces(session_index):
     # Load the position data.
-    session = FF.load_session(session_index)
+    session = ff.load_session(session_index)
 
     # Get freezing epochs.
     freeze_epochs = session.get_freezing_epochs_imaging_framerate()
@@ -94,7 +94,7 @@ def plot_freezing_traces(session_index):
 
 def freezing_trace_heatmap(session_index, neurons='all'):
     # Load the position data.
-    session = FF.load_session(session_index)
+    session = ff.load_session(session_index)
 
     # Get freezing epochs.
     freeze_epochs = session.get_freezing_epochs_imaging_framerate()
@@ -125,7 +125,9 @@ def freezing_trace_heatmap(session_index, neurons='all'):
     titles = neuron_number_title(neurons)
     f = ScrollPlot(plot_funcs.heatmap,
                    heatmap = freezing_traces,
-                   xlabel='Time from start of freezing (s)', ylabel='Freezing bout #', titles=titles)
+                   xlabel='Time from start of freezing (s)',
+                   ylabel='Freezing bout #', titles=titles)
+
 
 def plot_traces_over_days(session_index, neurons):
     # Get the mouse.
@@ -183,4 +185,4 @@ def plot_traces_over_days(session_index, neurons):
 
 
 if __name__ == '__main__':
-    plot_traces_over_days(0,[1,2,5])
+    #plot_prefreezing_traces(1)
