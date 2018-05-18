@@ -104,3 +104,9 @@ def plot_traces_over_days(obj):
         obj.ax[i].plot(obj.t[i],trace)
 
     obj.last_position = len(obj.traces) - 1
+
+def plot_raster(obj):
+    obj.ax.eventplot(obj.events[obj.current_position])
+    obj.ax.set_xlim([-obj.window, 0])
+
+    obj.last_position = len(obj.events) - 1

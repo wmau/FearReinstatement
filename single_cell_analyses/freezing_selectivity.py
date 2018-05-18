@@ -1,10 +1,15 @@
 from session_directory import load_session_list
-from ff_video_fixer import load_session as load_ff
+import ff_video_fixer as ff
 from calcium_events import load_events
 import numpy as np
 import helper_functions as helper
 from scipy.stats import ttest_1samp
 from calcium_traces import load_traces
+from scipy.stats import zscore
+from plot_helper import ScrollPlot, neuron_number_title
+import calcium_traces as ca_traces
+import plot_functions as plot_funcs
+import calcium_events as ca_events
 
 session_list = load_session_list()
 
@@ -19,7 +24,7 @@ class FreezingCellFilter:
         elif dtype == 'trace':
             self.events, _ = load_traces(session_index)
 
-        self.session = load_ff(session_index)
+        self.session = ff.load_session(session_index)
         self.freezing_epochs = \
             self.session.get_freezing_epochs_imaging_framerate()
         self.non_freezing_idx = self.get_non_freezing_epochs()
@@ -77,6 +82,61 @@ class FreezingCellFilter:
 
         return significant_cells, p
 
+def plot_prefreezing_traces(session_index, neurons=None, dtype='events',
+                            window=1):
+    # Load data and get freezing timestamps.
+    session = ff.load_session(session_index)
+    freeze_epochs = session.get_freezing_epochs_imaging_framerate()
+
+    if dtype == 'traces':
+        data, _ = ca_traces.load_traces(session_index)
+        data = zscore(data, axis=1)
+    elif dtype == 'events':
+        data, _ = ca_events.load_events(session_index)
+        data[data > 0] = 1
+    else:
+        raise ValueError("Invalid data type.")
+
+    if neurons is not None:
+        data = data[neurons]
+        titles = neuron_number_title(neurons)
+    else:
+        titles = neuron_number_title(range(len(data)))
+
+    n_neurons = len(data)
+    n_freezes = freeze_epochs.shape[0]
+    freeze_duration = np.ceil(window*20).astype(int)
+
+    prefreezing_traces = np.zeros((n_neurons, n_freezes, freeze_duration))
+
+    for n, trace in enumerate(data):
+        for i, epoch in enumerate(freeze_epochs):
+            start = epoch[0]-freeze_duration
+            stop = epoch[0]
+            prefreezing_traces[n, i, :] = trace[start:stop]
+
+    if dtype == 'events':
+        events = [[(np.where(bout)[0] - freeze_duration)/20
+                   for bout in cell]
+                   for cell in prefreezing_traces]
+
+        f = ScrollPlot(plot_funcs.plot_raster, events=events,
+                       window=window,
+                       xlabel='Time from start of freezing (s)',
+                       ylabel='Freezing bout #', titles=titles)
+
+    elif dtype == 'traces':
+        f = ScrollPlot(plot_funcs.plot_heatmap,
+                       heatmap = prefreezing_traces,
+                       xlabel = 'Time from start of freezing (s)',
+                       ylabel = 'Freezing bout #', titles=titles)
+
+    else:
+        raise ValueError("Invalid data type.")
+
+
 
 if __name__ == '__main__':
-    FreezingCellFilter(0, 'trace').get_freezing_cells()
+    #FreezingCellFilter(0, 'trace').get_freezing_cells()
+    plot_prefreezing_traces(1, window=10)
+    pass

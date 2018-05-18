@@ -43,7 +43,8 @@ class ScrollPlot:
                                            figsize = self.figsize)
 
         # Necessary for scrolling.
-        self.current_position = 0
+        if not hasattr(self, 'current_position'):
+            self.current_position = 0
 
         # Plot the first time series and label.
         self.plot_func(self)
