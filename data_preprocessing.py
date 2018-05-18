@@ -1,5 +1,6 @@
 import numpy as np
 import calcium_traces as ca_traces
+import calcium_events as ca_events
 import ff_video_fixer as ff
 from scipy.stats import zscore
 
@@ -18,6 +19,25 @@ def trim_session(data, indices):
 
     return data
 
+
+def load_and_trim(session_index, dtype='traces', neurons=None):
+    if dtype == 'traces':
+        data, t = ca_traces.load_traces(session_index)
+        data = zscore(data, axis=1)
+    elif dtype == 'events':
+        data, t = ca_events.load_events(session_index)
+    else:
+        raise ValueError('Wrong data type.')
+
+    if neurons is not None:
+        data = data[neurons]
+
+    session = ff.load_session(session_index)
+
+    data = trim_session(data, session.mouse_in_cage)
+    t = trim_session(t, session.mouse_in_cage)
+
+    return data, t
 
 def make_bins(data, samples_per_bin):
     length = len(data)
