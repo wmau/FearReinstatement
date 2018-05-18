@@ -89,8 +89,10 @@ def compute_matrices_across_days(session_1, session_2, bin_length=10,
 
     # If neurons are specified, narrow down the list.
     if neurons is not None:
-        found, idx = helper.ismember(neurons, match_map[:, map_idx[0]])
-        match_map = match_map[idx[found]]
+        global_cell_idx = cell_reg.find_cell_in_map(match_map,
+                                                    map_idx[0],
+                                                    neurons)
+        match_map = match_map[global_cell_idx]
 
     # Only take cells that persisted across the sessions.
     match_map = cell_reg.trim_match_map(match_map, map_idx)
@@ -151,9 +153,71 @@ def cosine_distance_between_matrices(session_1, session_2, bin_length=10,
 
     return distances
 
+def pairwise_correlate_traces(session_index, neurons=None):
+    """
+    Perform pairwise correlations between all (specified) cells in
+    a session.
+
+    Parameters
+    ---
+    session_index: scalar
+    neurons: (N,) array-like
+
+    Returns
+    ---
+    corr_matrix: (N,N) matrix containing correlation coefficients
+    """
+    # Load data and trim.
+    traces, t = d_pp.load_and_trim(session_index, neurons=neurons)
+    corr_matrix = np.corrcoef(traces)
+
+    return corr_matrix
+
+
+def cosine_distance_between_days(session_1, session_2, neurons=None):
+    # Load cell map.
+    mouse = session_list[session_1]["Animal"]
+    assert mouse == session_list[session_2]["Animal"], "Mice don't match."
+    match_map = cell_reg.load_cellreg_results(mouse)
+    map_idx = cell_reg.find_match_map_index((session_1, session_2))
+
+    # If neurons are specified, narrow down the list.
+    if neurons is not None:
+        global_cell_idx = cell_reg.find_cell_in_map(match_map,
+                                                    map_idx[0],
+                                                    neurons)
+        match_map = match_map[global_cell_idx]
+
+    # Only take cells that persisted across the sessions.
+    match_map = cell_reg.trim_match_map(match_map, map_idx)
+    neurons_ref = match_map[:, 0]
+    neurons_test = match_map[:, 1]
+
+    corr_matrix_1 = pairwise_correlate_traces(session_1, neurons_ref)
+    corr_matrix_2 = pairwise_correlate_traces(session_2, neurons_test)
+
+    d = distance.cosine(corr_matrix_1.flatten(), corr_matrix_2.flatten())
+
+    return d
+
 if __name__ == '__main__':
     # cell_map = cell_reg.load_cellreg_results('Fenrir')
     # cell_map = cell_reg.trim_match_map(cell_map, [10, 11, 12, 14])
     # neurons = cell_map[:, 0]
     # cosine_distance_between_matrices(10,11,time_slice=-2,neurons=neurons)
-    plot_matrices_across_days(10,11,cluster_here=698, n_clusters=10)
+    # plot_matrices_across_days(10,11,cluster_here=698, n_clusters=10)
+
+    s1 = [0, 5, 10, 15]
+    s2 = [[1, 2, 4], [6, 7, 9], [11, 12, 14], [16, 17, 19]]
+    all_sessions = [[0, 1, 2, 4], [5, 6, 7, 9], [10, 11, 12, 14],
+                    [15, 16, 17, 19]]
+
+    d = np.zeros((4,3))
+    for i, fc in enumerate(s1):
+        match_map = cell_reg.load_cellreg_results(session_list[fc]['Animal'])
+        trimmed = cell_reg.trim_match_map(match_map,all_sessions[i])
+        neurons = trimmed[:,0]
+        for j, s in enumerate(s2[i]):
+            d[i,j] = cosine_distance_between_days(fc, s, neurons=neurons)
+
+    pass
