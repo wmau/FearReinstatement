@@ -9,22 +9,23 @@ import ff_video_fixer as FF
 from mpl_toolkits.mplot3d import Axes3D
 import data_preprocessing as d_pp
 import calcium_events as ca_events
-from scipy.stats import zscore
+from scipy.stats import zscore, mode
+from session_directory import find_mouse_sessions
 
 session_list = load_session_list()
 
 
-def PCA_session(session_index, bin_length=1, dtype='trace'):
+def PCA_session(session_index, bin_length=1, dtype='traces'):
     session = FF.load_session(session_index)
 
     # Get accepted neurons.
-    if dtype == 'trace':
+    if dtype == 'traces':
         traces, t = ca_traces.load_traces(session_index)
         traces = zscore(traces, axis=1)
 
         scaler = StandardScaler()
         traces = scaler.fit_transform(traces)
-    elif dtype == 'event':
+    elif dtype == 'events':
         traces, t = ca_events.load_events(session_index)
     else:
         raise ValueError('Wrong dtype input.')
@@ -63,6 +64,64 @@ def PCA_session(session_index, bin_length=1, dtype='trace'):
     s = ax.scatter(Y[:, 0], Y[:, 1], Y[:, 2], c=binned_freezing)
     fig.show()
 
+def PCA_concatenated_sessions(mouse, bin_length=5, dtype='traces',
+                              global_cell_idx=None):
+    sessions, _ = find_mouse_sessions(mouse)
 
+    sessions = sessions[[0, 1, 2, 4]]
+
+    neural_data, days, t, freezing = \
+        d_pp.concatenate_sessions(sessions,
+                                  dtype=dtype,
+                                  global_cell_idx=global_cell_idx)
+    bins = d_pp.make_bins(t, bin_length*20)
+    neural_data = d_pp.bin_time_series(neural_data, bins)
+
+    X = np.mean(np.asarray(neural_data[0:-1]), axis=2)
+    X = np.append(X, np.mean(neural_data[-1], axis=1)[None, :],
+                  axis=0)
+
+    # Bin freezing vector.
+    binned_freezing = d_pp.bin_time_series(freezing, bins)
+    freezing = np.asarray([i.any() for i in binned_freezing])
+
+    binned_days = d_pp.bin_time_series(days, bins)
+    day_id, _ = mode(np.asarray(binned_days[0:-1]), axis=1)
+    day_id = np.append(day_id, mode(binned_days[-1])[0])
+
+
+    # pca = PCA(n_components=3)
+    # pca.fit(X)
+    # Y = pca.transform(X)
+    #
+    # fig = plt.figure()
+    # ax = Axes3D(fig)
+    #
+    #
+    # s1 = ax.scatter(Y[freezing, 0],
+    #                 Y[freezing, 1],
+    #                 Y[freezing, 2],
+    #                 c=day_id[freezing], s=40, marker='.', cmap='Reds')
+    # # s2 = ax.scatter(Y[~freezing, 0],
+    # #                 Y[~freezing, 1],
+    # #                 Y[~freezing, 2],
+    # #                 c=day_id[~freezing], s=40, marker='+', cmap='Reds')
+    pca = PCA(n_components=2)
+    pca.fit(X)
+    Y = pca.transform(X)
+
+    fig, ax = plt.subplots()
+    s1 = ax.scatter(Y[freezing, 0],
+                    Y[freezing, 1],
+                    c=day_id[freezing], s=40, marker='.',
+                    cmap='summer')
+    # s2 = ax.scatter(Y[~freezing, 0],
+    #                 Y[~freezing, 1],
+    #                 c=day_id[~freezing], s=40, marker='+',
+    #                 cmap='summer')
+
+    fig.show()
+
+    pass
 if __name__ == '__main__':
-    PCA_session(10,'event')
+    PCA_concatenated_sessions('Kerberos')
