@@ -31,8 +31,6 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
     else:
         raise ValueError('Predictor incorrectly defined.')
 
-    n_neurons = len(predictor_var)
-
     # Trim the traces to only include instances where mouse is in the chamber.
     t = d_pp.trim_session(t, session.mouse_in_cage)
     predictor_var = d_pp.trim_session(predictor_var,
@@ -54,6 +52,9 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
         X = np.sum(np.asarray(binned_activity[0:-1]),axis=2)
         X = np.append(X, np.sum(binned_activity[-1],axis=1)[None, :],
                       axis=0)
+
+    else:
+        raise ValueError('Invalid data type.')
 
     # Bin freezing vector.
     binned_freezing = d_pp.bin_time_series(freezing, bins)

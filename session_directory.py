@@ -10,6 +10,7 @@ from pickle import load
 from csv import DictReader
 from pickle import dump
 from helper_functions import find_dict_index
+import numpy as np
 
 master_directory = 'U:\Fear conditioning project_Mosaic2\SessionDirectories'
 
@@ -94,7 +95,7 @@ def find_mouse_sessions(mouse):
                       session_list)
     sessions = list(filtered)
 
-    idx = find_dict_index(session_list, "Animal", mouse)
+    idx = np.asarray(find_dict_index(session_list, "Animal", mouse))
 
     return idx, sessions
 
