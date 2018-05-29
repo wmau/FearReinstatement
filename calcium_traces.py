@@ -185,4 +185,4 @@ def plot_traces_over_days(session_index, neurons):
 
 
 if __name__ == '__main__':
-    #plot_prefreezing_traces(1)
+    pass

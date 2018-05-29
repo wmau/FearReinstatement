@@ -67,4 +67,4 @@ def plot_freezing(session_index):
 
 
 if __name__ == '__main__':
-    plot_freezing('Kerberos')
+    plot_freezing_percentages('Kerberos')

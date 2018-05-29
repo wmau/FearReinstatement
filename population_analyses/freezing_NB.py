@@ -64,6 +64,10 @@ def preprocess_NB(session_index, bin_length=2, predictor='traces'):
 
 
 def NB_session(X, Y):
+    """
+    Simple within-session naive Bayes decoder. CV done with default
+    0.2 leave-out.
+    """
     # Build train and test sets.
     X_train, X_test, y_train, y_test = \
         train_test_split(X, Y, test_size=0.2)
@@ -169,41 +173,10 @@ def cross_session_NB(train_session, test_session, bin_length=2,
 
     return score, permutation_scores, p_value
 
-def cross_session_NB2(train_session, test_session, bin_length=2,
-                      predictor='traces', neurons=None):
-    X_train, X_test, y_train, y_test = \
-        preprocess_NB_cross_session(train_session, test_session,
-                                    bin_length=bin_length,
-                                    predictor=predictor,
-                                    neurons=neurons)
-
-    X = np.concatenate((X_train, X_test))
-    y = y_train + y_test
-
-    train_label = np.zeros(len(y_train), dtype=int)
-    test_label = np.ones(len(y_test), dtype=int)
-    groups = np.concatenate((train_label, test_label))
-
-    cv = LeaveOneGroupOut()
-
-    if predictor == 'traces':
-        classifier = make_pipeline(StandardScaler(), GaussianNB())
-    elif predictor == 'events':
-        classifier = make_pipeline(MultinomialNB())
-    else:
-        raise ValueError('Predictor incorrectly defined.')
-
-    score, permutation_scores, p_value = \
-        permutation_test_score(classifier, X, y, scoring='accuracy',
-                               groups=groups, cv=cv, n_permutations=1000,
-                               n_jobs=1)
-
-    return score, permutation_scores, p_value
-
 
 if __name__ == '__main__':
     #from single_cell_analyses.footshock import ShockSequence
-    bin_length = 1
+    bin_length = 0.05
     # X, Y = preprocess_NB(0)
     # score, permutation_scores, p_value = NB_session_permutation(X, Y)
     # accuracy = NB_session(X, Y)
@@ -222,25 +195,22 @@ if __name__ == '__main__':
     pvals_events = np.zeros((len(session_1),3))
     scores_traces = np.zeros((len(session_1),3))
     pvals_traces = np.zeros((len(session_1),3))
-    #S = ShockSequence(s1)
-
     for i, fc in enumerate(session_1):
-        match_map = load_cellreg_results(session_list[fc]['Animal'])
-        trimmed = trim_match_map(match_map,all_sessions[i])
-        neurons = trimmed[:,0]
+        # match_map = load_cellreg_results(session_list[fc]['Animal'])
+        # trimmed = trim_match_map(match_map,all_sessions[i])
+        # neurons = trimmed[:,0]
         for j, ext in enumerate(session_2[i]):
             score, _, p_value = \
             cross_session_NB(fc, ext, bin_length=bin_length, predictor='events',
-                              neurons=neurons)
+                              )
 
             scores_events[i, j] = score
             pvals_events[i, j] = p_value
 
             score, _, p_value = \
             cross_session_NB(fc, ext, bin_length=bin_length, predictor='traces',
-                             neurons=neurons)
+                             )
 
             scores_traces[i, j] = score
             pvals_traces[i, j] = p_value
 
-    pass

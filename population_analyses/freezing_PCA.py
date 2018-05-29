@@ -98,14 +98,6 @@ def PCA_concatenated_sessions(mouse, bin_length=5, dtype='traces',
     # ax = Axes3D(fig)
     #
     #
-    # s1 = ax.scatter(Y[freezing, 0],
-    #                 Y[freezing, 1],
-    #                 Y[freezing, 2],
-    #                 c=day_id[freezing], s=40, marker='.', cmap='Reds')
-    # # s2 = ax.scatter(Y[~freezing, 0],
-    # #                 Y[~freezing, 1],
-    # #                 Y[~freezing, 2],
-    # #                 c=day_id[~freezing], s=40, marker='+', cmap='Reds')
     pca = PCA(n_components=2)
     pca.fit(X)
     Y = pca.transform(X)
@@ -121,6 +113,15 @@ def PCA_concatenated_sessions(mouse, bin_length=5, dtype='traces',
     #                 cmap='summer')
 
     fig.show()
+    # s1 = ax.scatter(Y[freezing, 0],
+    #                 Y[freezing, 1],
+    #                 Y[freezing, 2],
+    #                 c=day_id[freezing], s=40, marker='.', cmap='Reds')
+    # # s2 = ax.scatter(Y[~freezing, 0],
+    # #                 Y[~freezing, 1],
+    # #                 Y[~freezing, 2],
+    # #                 c=day_id[~freezing], s=40, marker='+', cmap='Reds')
+
 
     pass
 if __name__ == '__main__':
