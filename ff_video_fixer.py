@@ -190,26 +190,29 @@ class FFObj:
         """
         Match timestamps and position to imaging.
         """
-        _, imaging_t = ca_traces.load_traces(self.session_index)
-        x = np.interp(imaging_t, self.video_t, self.position[:, 0])
-        y = np.interp(imaging_t, self.video_t, self.position[:, 1])
-        imaging_v = np.interp(imaging_t, self.video_t, self.velocity)
+        _, self.imaging_t = ca_traces.load_traces(self.session_index)
+        self.x = np.interp(self.imaging_t, self.video_t,
+                           self.position[:, 0])
+        self.y = np.interp(self.imaging_t, self.video_t,
+                           self.position[:, 1])
+        self.imaging_v = np.interp(self.imaging_t, self.video_t,
+                                   self.velocity)
 
-        imaging_freezing = np.zeros(imaging_t.shape, dtype=bool)
+        self.imaging_freezing = np.zeros(self.imaging_t.shape,
+                                         dtype=bool)
         freezing_epochs = self.get_freezing_epochs()
 
         # Interpolate the freezing bouts.
         for this_epoch in freezing_epochs:
-            _, start_idx = find_closest(imaging_t,
+            _, start_idx = find_closest(self.imaging_t,
                                         self.video_t[this_epoch[0]])
-            _, end_idx = find_closest(imaging_t,
+            _, end_idx = find_closest(self.imaging_t,
                                       self.video_t[this_epoch[1] - 1])
-            imaging_freezing[start_idx:end_idx] = True
+            self.imaging_freezing[start_idx:end_idx] = True
 
-        return x, y, imaging_t, imaging_freezing, imaging_v
-
-    def detect_freezing(self, velocity_threshold, min_freeze_duration,
-                        plot_freezing):
+    def detect_freezing(self, velocity_threshold=7,
+                        min_freeze_duration=5,
+                        plot_freezing=True):
         """
         Detect freezing epochs.
         :param
@@ -296,10 +299,17 @@ class FFObj:
                             position=self.position, titles=titles)
 
 
-    def correct_position(self, current_position=0):
+    def correct_position(self, current_position=0, detect_freezing=True):
         self.plot_position(current_position)
         self.f.fig.canvas.mpl_connect('button_press_event',
                                       self.on_press)
+
+        while plt.get_fignums():
+            plt.waitforbuttonpress()
+
+        if detect_freezing:
+            self.detect_freezing(plot_freezing=False)
+            self.interpolate()
 
     def on_press(self, event):
         self.position[self.f.current_position] = \
@@ -331,19 +341,18 @@ class FFObj:
         # This is normally where the tracker fails.
         if manual_correct:
             print('Do manual corrections now.')
-            self.correct_position(mouse_in)
+            self.correct_position(mouse_in, detect_freezing=False)
             while plt.get_fignums():
                 plt.waitforbuttonpress()
 
             print('Do manual corrections again.')
-            self.correct_position(mouse_out)
+            self.correct_position(mouse_out, detect_freezing=False)
             while plt.get_fignums():
                 plt.waitforbuttonpress()
 
         self.detect_freezing(velocity_threshold, min_freeze_duration,
                              plot_freezing)
-        self.x, self.y, self.imaging_t, self.imaging_freezing, \
-            self.imaging_v = self.interpolate()
+        self.interpolate()
         self.get_mouse_in_cage_epoch(mouse_in, mouse_out)
 
     def save_data(self):
