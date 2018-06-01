@@ -267,13 +267,15 @@ class FFObj:
 
         return freeze_epochs
 
-    def get_mouse_in_cage_epoch(self):
+    def get_mouse_in_cage_epoch(self, frame1=None, frame2=None):
         # Get epoch (as a frame # of the tracking video) where mouse is in
         # the fear conditioning chamber.
-        print('Define frames where mouse enters the chamber (top) or '
-              'exits the chamber (bottom).')
         self.mouse_in_cage_imaging_t = np.zeros(2)
-        frame1, frame2 = self.scroll_through_frames()
+
+        if frame1 is None:
+            print('Define frames where mouse enters the chamber (top) or '
+                  'exits the chamber (bottom).')
+            frame1, frame2 = self.scroll_through_frames()
 
         # Get timestamps.
         self.mouse_in_cage_imaging_t[0], start = \
@@ -282,6 +284,7 @@ class FFObj:
             find_closest(self.imaging_t, self.video_t[frame2])
         self.mouse_in_cage = np.zeros(self.imaging_t.shape, dtype=bool)
         self.mouse_in_cage[start:end] = True
+
 
     def plot_position(self, current_position=0):
         # Plot frame and position of mouse.
@@ -319,11 +322,21 @@ class FFObj:
         """
         Main function for detecting mouse and correcting video.
         """
+        print('Select frame where mouse enters (top) and leaves '
+              '(bottom) the box.')
+        mouse_in, mouse_out = self.scroll_through_frames()
         self.auto_detect_mouse(smooth_sigma, mouse_threshold)
 
+        # Do manual correction around when mouse enters the cage.
+        # This is normally where the tracker fails.
         if manual_correct:
-            self.correct_position()
+            print('Do manual corrections now.')
+            self.correct_position(mouse_in)
+            while plt.get_fignums():
+                plt.waitforbuttonpress()
 
+            print('Do manual corrections again.')
+            self.correct_position(mouse_out)
             while plt.get_fignums():
                 plt.waitforbuttonpress()
 
@@ -331,7 +344,7 @@ class FFObj:
                              plot_freezing)
         self.x, self.y, self.imaging_t, self.imaging_freezing, \
             self.imaging_v = self.interpolate()
-        self.get_mouse_in_cage_epoch()
+        self.get_mouse_in_cage_epoch(mouse_in, mouse_out)
 
     def save_data(self):
         directory, _ = path.split(self.avi_location)

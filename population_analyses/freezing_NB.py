@@ -176,14 +176,15 @@ def cross_session_NB(train_session, test_session, bin_length=2,
 
 if __name__ == '__main__':
     #from single_cell_analyses.footshock import ShockSequence
-    bin_length = 0.05
+    bin_length = 1
     # X, Y = preprocess_NB(0)
     # score, permutation_scores, p_value = NB_session_permutation(X, Y)
     # accuracy = NB_session(X, Y)
-    session_1 = [0, 5, 10, 15]
-    session_2 = [[1, 2, 4], [6, 7, 9], [11, 12, 14], [16, 17, 19]]
+    session_1 = [0, 5, 10, 15, 20, 25]
+    session_2 = [[1, 2, 4], [6, 7, 9], [11, 12, 14], [16, 17, 19],
+                 [21, 22, 24], [26, 27]]
     all_sessions = [[0, 1, 2, 4], [5, 6, 7, 9], [10, 11, 12, 14],
-                    [15, 16, 17, 19]]
+                    [15, 16, 17, 19], [20, 21, 22, 24], [25, 26, 27]]
     # shuffled = []
     # for i in np.arange(100):
     #     accuracy = cross_session_NB(s1,s2,shuffle=True)

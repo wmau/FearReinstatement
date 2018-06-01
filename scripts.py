@@ -40,6 +40,7 @@ def CompareShockCellDecoderContribution():
             scores_without_random[i,j], _, _ = \
                 cross_session_NB(fc, ext, bin_length=bin_length,
                                  neurons=random_neurons_omitted)
+
      pass
 
 if __name__ == '__main__':
