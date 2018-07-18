@@ -13,9 +13,8 @@ import cv2
 from session_directory import load_session_list
 import plot_functions as plot_funcs
 from scipy.ndimage.filters import gaussian_filter as gfilt
-import calcium_traces as ca_traces
+from microscoPy_load import calcium_traces as ca_traces
 from helper_functions import find_closest
-import msvcrt as m
 
 session_list = load_session_list()
 

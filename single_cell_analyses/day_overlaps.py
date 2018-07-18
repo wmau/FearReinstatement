@@ -1,11 +1,9 @@
-from cell_reg import load_cellreg_results, trim_match_map
-import calcium_events as ca_events
+from microscoPy_load.cell_reg import load_cellreg_results, trim_match_map
+from microscoPy_load import calcium_events as ca_events, ff_video_fixer as ff
 import data_preprocessing as d_pp
-import calcium_traces as ca_traces
 import numpy as np
 from session_directory import load_session_list
 from helper_functions import ismember
-import ff_video_fixer as ff
 
 session_list = load_session_list()
 

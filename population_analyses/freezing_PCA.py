@@ -1,13 +1,11 @@
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from session_directory import load_session_list
-import calcium_traces as ca_traces
 import numpy as np
 from matplotlib import pyplot as plt
-import ff_video_fixer as FF
 from mpl_toolkits.mplot3d import Axes3D
 import data_preprocessing as d_pp
-import calcium_events as ca_events
+from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as FF
 from scipy.stats import zscore, mode
 from session_directory import find_mouse_sessions
 

@@ -6,8 +6,8 @@ import h5py
 import numpy as np
 import pickle
 from helper_functions import find_dict_index, ismember
-from cell_data_compiler import CellData
-from plot_helper import ScrollPlot, neuron_number_title
+from microscoPy_load.cell_data_compiler import CellData
+from plot_helper import ScrollPlot
 import plot_functions as plot_funcs
 
 session_list = load_session_list()

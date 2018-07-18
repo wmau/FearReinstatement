@@ -1,9 +1,6 @@
 import numpy as np
-import calcium_traces as ca_traces
-import calcium_events as ca_events
-import ff_video_fixer as ff
+from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, cell_reg, ff_video_fixer as ff
 from scipy.stats import zscore
-import cell_reg
 from session_directory import load_session_list
 
 session_list = load_session_list()

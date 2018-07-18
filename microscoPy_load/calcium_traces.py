@@ -5,15 +5,14 @@ Created on Wed Jan 17 14:11:14 2018
 @author: William Mau
 """
 
-from cell_data_compiler import CellData
+from microscoPy_load.cell_data_compiler import CellData
 from plot_helper import ScrollPlot, neuron_number_title
 from session_directory import load_session_list
 from os import path
-from pickle import load
 import plot_functions as plot_funcs
-import ff_video_fixer as ff
+from microscoPy_load import ff_video_fixer as ff
 import numpy as np
-from cell_reg import load_cellreg_results, find_match_map_index
+from microscoPy_load.cell_reg import load_cellreg_results, find_match_map_index
 from session_directory import find_mouse_sessions
 from helper_functions import ismember
 from scipy.stats import zscore
@@ -42,7 +41,7 @@ def load_traces(session_index):
     return data.traces.astype(np.float), data.t.astype(np.float)
 
 def save_traces(session_index):
-    from ff_video_fixer import load_session
+    from microscoPy_load.ff_video_fixer import load_session
 
     entire_session_traces, _ = load_traces(session_index)
     session = load_session(session_index)

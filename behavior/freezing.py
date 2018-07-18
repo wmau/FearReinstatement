@@ -1,7 +1,7 @@
 from session_directory import load_session_list, find_mouse_sessions
-from ff_video_fixer import load_session as load_ff
+from microscoPy_load.ff_video_fixer import load_session as load_ff
 import data_preprocessing as d_pp
-import calcium_events as ca_events
+from microscoPy_load import calcium_events as ca_events
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -38,7 +38,7 @@ def compute_percent_freezing(session_index, bin_length=100, plot_flag=False):
 
 def plot_freezing_percentages(mouse, bin_length=100):
     session_idx, _ = find_mouse_sessions(mouse)
-    del session_idx[3]
+    session_idx = session_idx[[0,1,2,4]]
 
     _, ax = plt.subplots(1,4,sharey=True)
     titles = ['Fear conditioning', 'Ext1', 'Ext2', 'Recall']
@@ -67,4 +67,6 @@ def plot_freezing(session_index):
 
 
 if __name__ == '__main__':
-    plot_freezing_percentages('Kerberos')
+    plot_freezing_percentages('Nix')
+
+    pass

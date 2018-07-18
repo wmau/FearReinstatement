@@ -1,23 +1,17 @@
 from session_directory import load_session_list
-import calcium_traces as ca_traces
-import calcium_events as ca_events
+from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff
 import numpy as np
-from helper_functions import find_closest, shift_rows, get_longest_run, \
-    ismember
+from helper_functions import find_closest, shift_rows, get_longest_run
 import data_preprocessing as d_pp
 from plot_helper import ScrollPlot, neuron_number_title
 import plot_functions as plot_funcs
-from scipy.stats import zscore, sem, pearsonr
-import matplotlib.pyplot as plt
+from scipy.stats import zscore
 from sklearn.preprocessing import normalize
 from os import path
 from pickle import load, dump
-import ff_video_fixer as ff
-from cell_reg import load_cellreg_results, find_cell_in_map, \
+from microscoPy_load.cell_reg import load_cellreg_results, find_cell_in_map, \
     find_match_map_index
 import matplotlib.pyplot as plt
-import scipy.signal as signal
-import itertools
 from single_cell_analyses.computations import xcorr_all_neurons
 
 session_list = load_session_list()

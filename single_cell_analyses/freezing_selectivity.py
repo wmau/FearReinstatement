@@ -1,15 +1,13 @@
 from session_directory import load_session_list
-import ff_video_fixer as ff
-from calcium_events import load_events
+from microscoPy_load.calcium_events import load_events
 import numpy as np
 import helper_functions as helper
 from scipy.stats import ttest_1samp
-from calcium_traces import load_traces
+from microscoPy_load.calcium_traces import load_traces
 from scipy.stats import zscore
 from plot_helper import ScrollPlot, neuron_number_title
-import calcium_traces as ca_traces
 import plot_functions as plot_funcs
-import calcium_events as ca_events
+from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff
 
 session_list = load_session_list()
 
@@ -134,7 +132,7 @@ def plot_prefreezing_traces(session_index, neurons=None, dtype='events',
     else:
         raise ValueError("Invalid data type.")
 
-
+    return f
 
 if __name__ == '__main__':
     #FreezingCellFilter(0, 'trace').get_freezing_cells()

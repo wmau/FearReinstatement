@@ -1,6 +1,4 @@
 import scipy.signal as signal
-from pickle import load, dump
-import calcium_traces as ca_traces
 import numpy as np
 from helper_functions import ismember
 import itertools

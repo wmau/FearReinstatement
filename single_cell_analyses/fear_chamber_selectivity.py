@@ -1,10 +1,7 @@
 from session_directory import load_session_list
 import data_preprocessing as d_pp
-import calcium_traces as ca_traces
-import calcium_events as ca_events
+from microscoPy_load import calcium_events as ca_events, ff_video_fixer as ff
 import numpy as np
-import ff_video_fixer as ff
-import scipy.stats as stats
 from plot_helper import ScrollPlot
 import plot_functions as plot_funcs
 

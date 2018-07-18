@@ -1,6 +1,4 @@
 import data_preprocessing as d_pp
-import calcium_traces as ca_traces
-import calcium_events as ca_events
 from scipy.spatial.distance import pdist
 from session_directory import load_session_list, find_mouse_sessions
 import numpy as np

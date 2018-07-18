@@ -3,8 +3,8 @@ from sklearn.feature_selection import RFECV
 from sklearn.svm import SVC
 import numpy as np
 from session_directory import find_mouse_sessions
-import matplotlib.pyplot as plt
-import cell_reg
+from microscoPy_load import cell_reg
+
 
 def RFE_single_session(session_index, bin_size=2, predictor='traces'):
     """

@@ -5,12 +5,11 @@ Created on Mon Jan 22 11:09:29 2018
 @author: William Mau
 """
 
-from cell_data_compiler import CellData
+from microscoPy_load.cell_data_compiler import CellData
 from session_directory import load_session_list
 from plot_helper import ScrollPlot, neuron_number_title
 import plot_functions as plot_funcs
-import matplotlib.pyplot as plt
-import calcium_traces as ca_traces
+from microscoPy_load import calcium_traces as ca_traces
 from helper_functions import find_closest
 import numpy as np
 from os import path
@@ -36,7 +35,7 @@ def load_event_times(session_index):
 
 
 def save_events(session_index):
-    from ff_video_fixer import load_session
+    from microscoPy_load.ff_video_fixer import load_session
 
     entire_session_events, _ = load_events(session_index)
     session = load_session(session_index)

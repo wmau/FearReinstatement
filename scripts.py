@@ -1,7 +1,7 @@
 from population_analyses.freezing_classifier import classify_cross_session
 import numpy as np
 from single_cell_analyses.footshock import ShockSequence
-from calcium_events import load_events
+from microscoPy_load.calcium_events import load_events
 import random
 from session_directory import get_session_stage, get_session
 from sklearn.svm import SVC

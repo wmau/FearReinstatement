@@ -1,6 +1,4 @@
-import calcium_traces as ca_traces
 import data_preprocessing as d_pp
-import ff_video_fixer as ff
 import numpy as np
 from scipy.stats import zscore
 from session_directory import load_session_list
@@ -10,11 +8,9 @@ from sklearn.model_selection import train_test_split, StratifiedKFold, \
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler, Imputer
-from sklearn.svm import SVC
-from cell_reg import load_cellreg_results, find_match_map_index, \
+from microscoPy_load.cell_reg import load_cellreg_results, find_match_map_index, \
     find_cell_in_map
-import calcium_events as ca_events
-
+from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff
 
 session_list = load_session_list()
 

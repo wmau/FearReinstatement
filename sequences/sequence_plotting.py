@@ -2,13 +2,11 @@ from sequences.seqNMF_data import seqNMF
 from session_directory import load_session_list
 import numpy as np
 import matplotlib.pyplot as plt
-import calcium_traces as ca_traces
 from scipy.stats import zscore
 import data_preprocessing as d_pp
-import ff_video_fixer as ff
 from matplotlib import gridspec
-import calcium_events as ca_events
-from cell_reg import load_cellreg_results, find_match_map_index, \
+from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff
+from microscoPy_load.cell_reg import load_cellreg_results, find_match_map_index, \
     find_cell_in_map
 
 session_list = load_session_list()
