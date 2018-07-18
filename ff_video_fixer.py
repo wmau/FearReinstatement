@@ -326,6 +326,9 @@ class FFObj:
                        position=self.position, freezing=self.freezing,
                        titles=titles)
 
+    def plot_velocity(self):
+        plt.plot(self.velocity)
+
     def process_video(self, smooth_sigma=6, mouse_threshold=0.15,
                       velocity_threshold=7, min_freeze_duration=5,
                       plot_freezing=True, manual_correct=True):
@@ -362,7 +365,10 @@ class FFObj:
         with open(movie_file, 'wb') as output:
             dump(self, output)
 
-        del self.movie
+        if hasattr(self, 'movie'):
+            del self.movie
+        if hasattr(self, 'f'):
+            del self.f
 
         with open(self.location, 'wb') as output:
             dump(self, output)

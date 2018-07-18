@@ -249,6 +249,10 @@ def pairwise_correlate_traces(session_index, neurons=None):
 
 
 def cosine_distance_between_days(session_1, session_2, neurons=None):
+    """
+    Compute the cosine distance between two correlation matrices, each
+    representing pairwise cell relationships within a session.
+    """
     # Load cell map.
     mouse = session_list[session_1]["Animal"]
     assert mouse == session_list[session_2]["Animal"], "Mice don't match."
@@ -299,3 +303,5 @@ if __name__ == '__main__':
     # pass
 
     do_cosine_distance_analysis('Kerberos')
+
+    pass
