@@ -1,8 +1,10 @@
-from population_analyses.freezing_NB import cross_session_NB
+from population_analyses.freezing_classifier import classify_cross_session
 import numpy as np
 from single_cell_analyses.footshock import ShockSequence
 from calcium_events import load_events
 import random
+from session_directory import get_session_stage, get_session
+from sklearn.svm import SVC
 
 def CompareShockCellDecoderContribution():
 
@@ -30,18 +32,50 @@ def CompareShockCellDecoderContribution():
 
         for j, ext in enumerate(session_2[i]):
             scores_with[i,j], _, _ = \
-                cross_session_NB(fc, ext, bin_length=bin_length,
-                                 neurons=shock_neurons)
+                classify_cross_session(fc, ext, bin_length=bin_length,
+                                       neurons=shock_neurons)
 
             scores_without[i,j], _, _ = \
-                cross_session_NB(fc, ext, bin_length=bin_length,
-                                 neurons=shock_neurons_omitted)
+                classify_cross_session(fc, ext, bin_length=bin_length,
+                                       neurons=shock_neurons_omitted)
 
             scores_without_random[i,j], _, _ = \
-                cross_session_NB(fc, ext, bin_length=bin_length,
-                                 neurons=random_neurons_omitted)
+                classify_cross_session(fc, ext, bin_length=bin_length,
+                                       neurons=random_neurons_omitted)
 
-     pass
+
+def CrossSessionNaiveBayes(bin_length = 1, I = 1000):
+    mice = ['Kerberos',
+            'Nix',
+            'Titan',
+            'Hyperion',
+            'Calypso',
+            'Pandora',
+            'Janus',
+            ]
+
+    session_1 = get_session_stage('FC')[0]
+    session_2 = [get_session(mouse,'E1_1','E2_1','RE_1')[0]
+                 for mouse in mice]
+
+    scores = np.zeros((len(session_1),3))
+    pvals = np.zeros((len(session_1),3))
+    permuted = np.zeros((len(session_1),3,I))
+    for i, fc in enumerate(session_1):
+        # match_map = load_cellreg_results(session_list[fc]['Animal'])
+        # trimmed = trim_match_map(match_map,all_sessions[i])
+        # neurons = trimmed[:,0]
+        for j, ext in enumerate(session_2[i]):
+            score, permuted_scores, p_value = \
+            classify_cross_session(fc, ext, bin_length=bin_length,
+                                   predictor='traces', I=I,
+                                   classifier=SVC(kernel='linear'))
+
+            scores[i, j] = score
+            pvals[i, j] = p_value
+            permuted[i, j, :] = permuted_scores
+
+    return scores, pvals, permuted
 
 if __name__ == '__main__':
-    CompareShockCellDecoderContribution()
+    CrossSessionNaiveBayes()

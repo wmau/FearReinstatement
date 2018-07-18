@@ -91,14 +91,79 @@ def find_mouse_directory(mouse):
 def find_mouse_sessions(mouse):
     session_list = load_session_list()
 
-    filtered = filter(lambda sessions: sessions["Animal"] == mouse,
-                      session_list)
-    sessions = list(filtered)
+    sessions = list(filter(lambda sessions: sessions["Animal"] == mouse,
+                    session_list))
 
     idx = np.asarray(find_dict_index(session_list, "Animal", mouse))
 
     return idx, sessions
 
 
+def get_session_stage(stages_tuple):
+    """
+    Gets session index in session_list by searching for strings in
+    the Session key. Can input multiple session stages.
+
+    Parameters
+    ---
+    stages_tuple: tuple of string keywords, valid inputs:
+        FC: fear conditioning
+        E1_1: extinction day 1, fear conditioning context.
+        E1_2: extinction day 1, harmless context.
+        E2_1: extinction day 2, fear conditioning context.
+        E2_2: extinction day 2, harmless context.
+        RI: reinstatement.
+        RE_1: recall, fear conditioning context.
+        RE_2: recall, harmless context.
+
+    Return
+    ---
+    indices: indices of session_list matching str.
+    types: session types for each entry in indices.
+
+    """
+    session_list = load_session_list()
+    indices = []
+    stages = []
+    for session_stage in stages_tuple:
+        # Get all the indices matching the type.
+        indices_for_this_stage = find_dict_index(session_list,
+                                                 "Session",
+                                                 session_stage)
+        indices.extend(indices_for_this_stage)
+
+        # Compile the list of session_types.
+        stages.extend([session_stage
+                       for session in indices_for_this_stage])
+
+    return indices, stages
+
+
+def get_session(mouse, stages_tuple):
+    """
+    Gets a specific session for a mouse.
+
+    Parameters
+    ---
+    mouse: str, mouse name.
+    stages_tuple: tuple of strings, session stages. See
+    get_session_type() for valid inputs.
+
+    Return
+    sessions: indices of session_list.
+
+    """
+    mouse_sessions, _ = find_mouse_sessions(mouse)
+    sessions_at_that_stage, stages = get_session_stage(stages_tuple)
+
+    # Get intersection.
+    sessions = [i for i in sessions_at_that_stage
+                if i in mouse_sessions]
+    stages = [stage for i, stage in zip(sessions_at_that_stage, stages)
+              if i in mouse_sessions]
+
+    return sessions, stages
+
+
 if __name__ == '__main__':
-    find_mouse_sessions("Kerberos")
+    indices, stages = get_session('Kerberos',('E1_1', 'E2_1', 'RE_1'))
