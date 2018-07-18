@@ -1,5 +1,4 @@
 from sklearn.decomposition import PCA
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.preprocessing import StandardScaler
 from session_directory import load_session_list
 import calcium_traces as ca_traces
@@ -64,8 +63,8 @@ def PCA_session(session_index, bin_length=1, dtype='traces'):
     s = ax.scatter(Y[:, 0], Y[:, 1], Y[:, 2], c=binned_freezing)
     fig.show()
 
-def PCA_concatenated_sessions(mouse, bin_length=5, dtype='traces',
-                              global_cell_idx=None):
+def PCA_concatenated_sessions(mouse, bin_length=1, dtype='traces',
+                              global_cell_idx=None, plot_flag=True):
     sessions, _ = find_mouse_sessions(mouse)
 
     sessions = sessions[[0, 1, 2, 4]]
@@ -74,6 +73,8 @@ def PCA_concatenated_sessions(mouse, bin_length=5, dtype='traces',
         d_pp.concatenate_sessions(sessions,
                                   dtype=dtype,
                                   global_cell_idx=global_cell_idx)
+
+    #neural_data = zscore(neural_data,axis=1)
     bins = d_pp.make_bins(t, bin_length*20)
     neural_data = d_pp.bin_time_series(neural_data, bins)
 
@@ -102,27 +103,41 @@ def PCA_concatenated_sessions(mouse, bin_length=5, dtype='traces',
     pca.fit(X)
     Y = pca.transform(X)
 
-    fig, ax = plt.subplots()
-    s1 = ax.scatter(Y[freezing, 0],
-                    Y[freezing, 1],
-                    c=day_id[freezing], s=40, marker='.',
-                    cmap='summer')
-    # s2 = ax.scatter(Y[~freezing, 0],
-    #                 Y[~freezing, 1],
-    #                 c=day_id[~freezing], s=40, marker='+',
-    #                 cmap='summer')
+    if plot_flag:
+        fig, ax = plt.subplots()
+        ax.scatter(Y[freezing, 0], Y[freezing, 1],
+                   c=day_id[freezing], s=40,
+                   marker='P', cmap='summer',alpha=0.2)
+        ax.scatter(Y[~freezing, 0], Y[~freezing, 1],
+                   c=day_id[~freezing], s=40,
+                   marker='.', cmap='summer',alpha=0.2)
 
-    fig.show()
-    # s1 = ax.scatter(Y[freezing, 0],
-    #                 Y[freezing, 1],
-    #                 Y[freezing, 2],
-    #                 c=day_id[freezing], s=40, marker='.', cmap='Reds')
-    # # s2 = ax.scatter(Y[~freezing, 0],
-    # #                 Y[~freezing, 1],
-    # #                 Y[~freezing, 2],
-    # #                 c=day_id[~freezing], s=40, marker='+', cmap='Reds')
+        freezing_center = np.zeros((len(sessions),2))
+        nonfreezing_center = np.zeros((len(sessions),2))
+        unique_days = np.unique(day_id)
+        for i, day in enumerate(unique_days):
+            points = Y[(day_id == day) & (freezing)]
+            freezing_center[i] = np.mean(points, axis=0)
+
+            points = Y[(day_id == day) & (~freezing)]
+            nonfreezing_center[i] = np.mean(points, axis=0)
+
+        ax.scatter(freezing_center[:,0], freezing_center[:,1],
+                   marker='P', c=unique_days, cmap='summer', s=200,
+                   edgecolors='k', linewidth=2)
+        ax.scatter(nonfreezing_center[:,0], nonfreezing_center[:,0],
+                   marker='.', c=unique_days, cmap='summer', s=200,
+                   edgecolors='k', linewidth=2)
+        plt.xlabel('PC 1')
+        plt.ylabel('PC 2')
+        fig.show()
+
+    return Y, freezing
+
 
 
     pass
+
+
 if __name__ == '__main__':
     PCA_concatenated_sessions('Kerberos')
