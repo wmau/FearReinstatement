@@ -3,8 +3,8 @@ from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_tr
 import numpy as np
 from helper_functions import find_closest, shift_rows, get_longest_run
 import data_preprocessing as d_pp
-from plot_helper import ScrollPlot, neuron_number_title
-import plot_functions as plot_funcs
+from plotting.plot_helper import ScrollPlot, neuron_number_title
+from plotting import plot_functions as plot_funcs
 from scipy.stats import zscore
 from sklearn.preprocessing import normalize
 from os import path

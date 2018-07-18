@@ -1,6 +1,6 @@
 from glob import glob
 from os import path
-from plot_helper import ScrollPlot
+from plotting.plot_helper import ScrollPlot
 import matplotlib.pyplot as plt
 import pygame
 import skvideo.io
@@ -11,7 +11,7 @@ from PIL import Image
 import numpy as np
 import cv2
 from session_directory import load_session_list
-import plot_functions as plot_funcs
+from plotting import plot_functions as plot_funcs
 from scipy.ndimage.filters import gaussian_filter as gfilt
 from microscoPy_load import calcium_traces as ca_traces
 from helper_functions import find_closest

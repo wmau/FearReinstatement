@@ -5,8 +5,8 @@ import helper_functions as helper
 from scipy.stats import ttest_1samp
 from microscoPy_load.calcium_traces import load_traces
 from scipy.stats import zscore
-from plot_helper import ScrollPlot, neuron_number_title
-import plot_functions as plot_funcs
+from plotting.plot_helper import ScrollPlot, neuron_number_title
+from plotting import plot_functions as plot_funcs
 from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff
 
 session_list = load_session_list()

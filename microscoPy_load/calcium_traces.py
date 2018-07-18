@@ -6,10 +6,10 @@ Created on Wed Jan 17 14:11:14 2018
 """
 
 from microscoPy_load.cell_data_compiler import CellData
-from plot_helper import ScrollPlot, neuron_number_title
+from plotting.plot_helper import ScrollPlot, neuron_number_title
 from session_directory import load_session_list
 from os import path
-import plot_functions as plot_funcs
+from plotting import plot_functions as plot_funcs
 from microscoPy_load import ff_video_fixer as ff
 import numpy as np
 from microscoPy_load.cell_reg import load_cellreg_results, find_match_map_index

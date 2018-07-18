@@ -2,8 +2,8 @@ from session_directory import load_session_list
 import data_preprocessing as d_pp
 from microscoPy_load import calcium_events as ca_events, ff_video_fixer as ff
 import numpy as np
-from plot_helper import ScrollPlot
-import plot_functions as plot_funcs
+from plotting.plot_helper import ScrollPlot
+from plotting import plot_functions as plot_funcs
 
 session_list = load_session_list()
 

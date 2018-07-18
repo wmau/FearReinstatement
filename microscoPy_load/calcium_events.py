@@ -7,8 +7,8 @@ Created on Mon Jan 22 11:09:29 2018
 
 from microscoPy_load.cell_data_compiler import CellData
 from session_directory import load_session_list
-from plot_helper import ScrollPlot, neuron_number_title
-import plot_functions as plot_funcs
+from plotting.plot_helper import ScrollPlot, neuron_number_title
+from plotting import plot_functions as plot_funcs
 from microscoPy_load import calcium_traces as ca_traces
 from helper_functions import find_closest
 import numpy as np
