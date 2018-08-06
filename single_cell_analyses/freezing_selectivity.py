@@ -1,4 +1,4 @@
-from session_directory import load_session_list
+from session_directory import load_session_list, get_session
 from microscoPy_load.calcium_events import load_events
 import numpy as np
 import helper_functions as helper
@@ -8,6 +8,7 @@ from scipy.stats import zscore
 from plotting.plot_helper import ScrollPlot, neuron_number_title
 from plotting import plot_functions as plot_funcs
 from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff
+import matplotlib.pyplot as plt
 
 session_list = load_session_list()
 
@@ -80,9 +81,10 @@ class FreezingCellFilter:
 
         return significant_cells, p
 
-def plot_prefreezing_traces(session_index, neurons=None, dtype='events',
-                            window=1):
+def plot_prefreezing_traces(mouse, stage_tuple, neurons=None,
+                            dtype='events', window=(-2,2)):
     # Load data and get freezing timestamps.
+    session_index = get_session(mouse, stage_tuple)[0]
     session = ff.load_session(session_index)
     freeze_epochs = session.get_freezing_epochs_imaging_framerate()
 
@@ -103,10 +105,10 @@ def plot_prefreezing_traces(session_index, neurons=None, dtype='events',
 
     n_neurons = len(data)
     n_freezes = freeze_epochs.shape[0]
-    freeze_duration = np.ceil(window*20).astype(int)
+    freeze_duration = abs(np.ceil(np.diff(window)*20)).astype(int)[0]
 
     prefreezing_traces = np.zeros((n_neurons, n_freezes, freeze_duration))
-
+    t = np.arange(window[0], window[1], 1/20)
     for n, trace in enumerate(data):
         for i, epoch in enumerate(freeze_epochs):
             start = epoch[0]-freeze_duration
@@ -124,8 +126,9 @@ def plot_prefreezing_traces(session_index, neurons=None, dtype='events',
                        ylabel='Freezing bout #', titles=titles)
 
     elif dtype == 'traces':
-        f = ScrollPlot(plot_funcs.plot_heatmap,
-                       heatmap = prefreezing_traces,
+        f = ScrollPlot(plot_funcs.plot_multiple_traces,
+                       traces = prefreezing_traces,
+                       t = t,
                        xlabel = 'Time from start of freezing (s)',
                        ylabel = 'Freezing bout #', titles=titles)
 
@@ -136,5 +139,6 @@ def plot_prefreezing_traces(session_index, neurons=None, dtype='events',
 
 if __name__ == '__main__':
     #FreezingCellFilter(0, 'trace').get_freezing_cells()
-    plot_prefreezing_traces(1, window=10)
+    plot_prefreezing_traces('Kerberos','E1_1', window=(-5,5), dtype='traces')
+    plt.show()
     pass

@@ -1,21 +1,28 @@
 import data_preprocessing as d_pp
 import numpy as np
+import random
 from scipy.stats import zscore
 from session_directory import load_session_list
 from sklearn import metrics
 from sklearn.model_selection import train_test_split, StratifiedKFold, \
     permutation_test_score
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
+from sklearn.svm import SVC
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler, Imputer
 from microscoPy_load.cell_reg import load_cellreg_results, find_match_map_index, \
     find_cell_in_map
 from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff
+import matplotlib.pyplot as plt
+from session_directory import get_session
+from sklearn.decomposition import PCA
+from helper_functions import find_closest
 
 session_list = load_session_list()
 
 
-def preprocess(session_index, bin_length=2, predictor='traces'):
+def preprocess(session_index, bin_length=2, predictor='traces',
+               from_this_time=0):
     session = ff.load_session(session_index)
 
     # Get accepted neurons.
@@ -35,6 +42,13 @@ def preprocess(session_index, bin_length=2, predictor='traces'):
                                       session.mouse_in_cage)
     freezing = d_pp.trim_session(session.imaging_freezing,
                                  session.mouse_in_cage)
+
+    # Only take data from this time onwards.
+    from_this_ind = find_closest(t, from_this_time)[1]
+    t = t[from_this_ind:]
+    predictor_var = predictor_var[:,from_this_ind:]
+    freezing = freezing[from_this_ind:]
+
 
     # Define bin limits.
     samples_per_bin = bin_length * 20
@@ -56,7 +70,7 @@ def preprocess(session_index, bin_length=2, predictor='traces'):
 
     # Bin freezing vector.
     binned_freezing = d_pp.bin_time_series(freezing, bins)
-    Y = [i.any() for i in binned_freezing]
+    Y = [i.all() for i in binned_freezing]
 
     # Handle missing values.
     imp = Imputer(missing_values='NaN', strategy='median', axis=0)
@@ -103,7 +117,7 @@ def classify_with_permutation(X, Y):
 
 def preprocess_cross_session(train_session, test_session,
                              bin_length=2, predictor='traces',
-                             neurons=None):
+                             neurons=None, from_this_time=698):
     # Make sure the data comes from the same mouse.
     mouse = session_list[train_session]["Animal"]
     assert mouse == session_list[test_session]["Animal"], \
@@ -111,7 +125,8 @@ def preprocess_cross_session(train_session, test_session,
 
     # Trim and bin data from both sessions.
     X_train, y_train = preprocess(train_session, bin_length=bin_length,
-                                  predictor=predictor)
+                                  predictor=predictor,
+                                  from_this_time=from_this_time)
     X_test, y_test = preprocess(test_session, bin_length=bin_length,
                                 predictor=predictor)
 
@@ -139,64 +154,100 @@ def fit_cross_session(X_train, X_test, y_train, y_test,
                       classifier=
                       make_pipeline(StandardScaler(), GaussianNB())):
 
-    classifier.fit(X_train, y_train)
-    predict_test = classifier.predict(X_test)
-
-    accuracy = metrics.accuracy_score(y_test, predict_test)
+    if X_train.shape[1] == 0:
+        accuracy = np.nan
+        print('Warning: fit failed. # of features = 0.')
+    else:
+        classifier.fit(X_train, y_train)
+        accuracy = classifier.score(X_test, y_test)
 
     return accuracy
 
 
 def classify_cross_session(train_session, test_session, bin_length=2,
                            predictor='traces', neurons=None, I=1000,
-                           classifier=None):
+                           classifier=None, shuffle='neuron',
+                           from_this_time=698):
 
     X_train, X_test, y_train, y_test = \
         preprocess_cross_session(train_session, test_session,
                                  bin_length=bin_length,
                                  predictor=predictor,
-                                 neurons=neurons)
+                                 neurons=neurons,
+                                 from_this_time=from_this_time)
 
     if classifier is None:
         if predictor == 'traces':
-            classifier = make_pipeline(StandardScaler(), GaussianNB())
+            classifier = make_pipeline(StandardScaler(),
+                                       GaussianNB())
         elif predictor == 'events':
             classifier = MultinomialNB()
         else:
             raise ValueError('Wrong predictor data type.')
+    else:
+        classifier = make_pipeline(StandardScaler(),
+                                   classifier)
 
-
-    score = fit_cross_session(X_train, X_test, y_train, y_test,
+    permutation_scores = np.empty((I))
+    permutation_scores.fill(np.nan)
+    if X_train.shape[1] == 0:
+        score = np.nan
+        print('Warning: fit failed. # of features = 0.')
+    else:
+        score = fit_cross_session(X_train, X_test, y_train, y_test,
                               classifier=classifier)
 
-    permutation_scores = np.zeros((I))
-    for i in range(I):
-        y_shuffle = np.random.permutation(y_train)
+        if shuffle == 'scramble':
+            for i in range(I):
+                y_shuffle = np.random.permutation(y_train)
 
-        permutation_scores[i] = fit_cross_session(X_train, X_test,
-                                                  y_shuffle, y_test,
-                                                  classifier=classifier)
+                permutation_scores[i] = fit_cross_session(X_train, X_test,
+                                                          y_shuffle, y_test,
+                                                          classifier=classifier)
+        elif shuffle == 'roll':
+            for i in range(I):
+                y_shuffle = np.roll(y_train, random.randint(0,len(y_train)))
 
-    p_value = np.sum(score < permutation_scores)/I
+                permutation_scores[i] = fit_cross_session(X_train, X_test,
+                                                          y_shuffle, y_test,
+                                                          classifier=classifier)
+        elif shuffle == 'neuron':
+            for i in range(I):
+                order = np.random.permutation(np.arange(0,X_test.shape[1]))
+                X_shuffle = X_test[:,order]
+
+                permutation_scores[i] = fit_cross_session(X_train, X_shuffle,
+                                                          y_train, y_test,
+                                                          classifier=classifier)
+
+    p_value = np.sum(score <= permutation_scores)/I
 
     return score, permutation_scores, p_value
 
-def cross_session_classify_timelapse(train_session, test_session,
+def cross_session_classify_timelapse(mouse, stages_tuple,
                                      resolution=0.05,
                                      score_avg_bin_length=30,
-                                     predictor_type='traces', neurons=None):
+                                     predictor_type='traces',
+                                     neurons=None,
+                                     classifier=None):
+    train_session = get_session(mouse, stages_tuple[0])[0]
+    test_session  = get_session(mouse, stages_tuple[1])[0]
+
     X_train, X_test, y_train, y_test = \
         preprocess_cross_session(train_session, test_session,
                                  bin_length=resolution,
                                  predictor=predictor_type,
                                  neurons=neurons)
 
-    if predictor_type == 'traces':
-        classifier = make_pipeline(StandardScaler(), GaussianNB())
-    elif predictor_type == 'events':
-        classifier = MultinomialNB()
+    if classifier is None:
+        if predictor_type == 'traces':
+            classifier = make_pipeline(StandardScaler(), GaussianNB())
+        elif predictor_type == 'events':
+            classifier = MultinomialNB()
+        else:
+            raise ValueError('Wrong predictor data type.')
     else:
-        raise ValueError('Wrong predictor data type.')
+        classifier = make_pipeline(StandardScaler(), classifier)
 
     bin_size = int(score_avg_bin_length / resolution)
     score_avg_bins = d_pp.make_bins(X_test[:,0], bin_size)
@@ -212,7 +263,12 @@ def cross_session_classify_timelapse(train_session, test_session,
         scores[i] = fit_cross_session(X_train, predictor.T, y_train,
                                       response, classifier=classifier)
 
+    plt.plot(scores)
+    plt.show()
     return scores
 
 if __name__ == '__main__':
-    classify_cross_session(23, 30, predictor='traces', bin_length=1)
+    cross_session_classify_timelapse('Kepler', ('FC','RE_1'),
+                                     predictor_type='traces',
+                                     resolution=1,
+                                     classifier=SVC(kernel='linear'))

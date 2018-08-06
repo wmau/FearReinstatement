@@ -3,6 +3,7 @@ List of plotting functions to pass through ScrollPlot
 """
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import numpy as np
 
 def plot_traces(obj):
     """
@@ -89,14 +90,21 @@ def plot_multiple_traces(obj):
         c = cm.gray(i/len(obj.traces[obj.current_position]),1)
         obj.ax.plot(obj.t,trace,color=c)
 
+    obj.ax.plot(obj.t,np.mean(obj.traces[obj.current_position],
+                              axis=0),
+                color='r', linewidth=2)
+
     obj.last_position = len(obj.traces) - 1
 
 def plot_footprints_over_days(obj):
     for i,footprint in enumerate(obj.footprints[obj.current_position]):
         obj.ax[i].imshow(footprint, cmap='gray')
-        obj.ax[i].axis('equal')
-        obj.ax[i].axis('off')
 
+    for ax in obj.ax:
+        ax.set_yticks([])
+        ax.set_xticks([])
+
+    plt.setp(obj.ax.flat, aspect='equal')
     obj.last_position = len(obj.footprints) - 1
 
 def plot_traces_over_days(obj):
