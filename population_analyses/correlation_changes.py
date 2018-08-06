@@ -7,7 +7,7 @@ from matplotlib.collections import LineCollection
 from sklearn.cluster import k_means
 from microscoPy_load import cell_reg
 from scipy.spatial import distance
-from session_directory import find_mouse_sessions
+from session_directory import get_session
 from behavior.freezing import compute_percent_freezing
 
 session_list = load_session_list()
@@ -113,8 +113,10 @@ def compute_matrices_across_days(session_1, session_2, bin_length=10,
 
     return corr_matrices_1, corr_matrices_2, order, clusters
 
-def plot_matrices_across_days(session_1, session_2, bin_length=10,
-                              neurons=None, n_clusters=5, cluster_here=0):
+def plot_matrices_across_days(mouse, stages_tuple, bin_length=10,
+                              neurons=None, n_clusters=5, cluster_here=938):
+    session_1, _ = get_session(mouse, stages_tuple[0])
+    session_2, _ = get_session(mouse, stages_tuple[1])
 
     corr_matrices_1, corr_matrices_2, order, clusters = \
         compute_matrices_across_days(session_1, session_2,
@@ -128,7 +130,7 @@ def plot_matrices_across_days(session_1, session_2, bin_length=10,
 
 
 def cosine_distance_between_matrices(session_1, session_2, bin_length=10,
-                                     neurons=None, ref_time=0):
+                                     neurons=None, ref_time=938):
     """
     Perform pairwise correlations between cells within days then
     linearize these matrices and get their cosine distance across
@@ -193,18 +195,18 @@ def cosine_distance_between_matrices(session_1, session_2, bin_length=10,
     plt.ylabel('Cosine similarity')
     plt.xlabel('Time bin')
     ax.set_xlim(0, len(similarity))
-    ax.set_ylim(similarity.min(), similarity.max())
+    ax.set_ylim(np.nanmin(similarity), np.nanmax(similarity))
     f.colorbar(line, ax=ax)
 
     return similarity
 
 
-def do_cosine_distance_analysis(mouse, bin_length=1, neurons=None,
+def do_cosine_distance_analysis(mouse, bin_length=5, neurons=None,
                                 ref_time=938):
-    sessions, _ = find_mouse_sessions(mouse)
+    sessions, _ = get_session(mouse, ('FC','E1_1','E2_1','RE_1'))
 
     s1 = sessions[0]
-    s2 = sessions[[1,2,4]]
+    s2 = sessions[1:]
 
     d = []
     for i, session in enumerate(s2):
@@ -296,6 +298,6 @@ if __name__ == '__main__':
     #
     # pass
 
-    do_cosine_distance_analysis('Kerberos')
-
+    do_cosine_distance_analysis('Janus', ref_time=938)
+    plt.show()
     pass

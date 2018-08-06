@@ -2,7 +2,7 @@ from population_analyses.freezing_classifier import preprocess as preprocess
 from sklearn.feature_selection import RFECV
 from sklearn.svm import SVC
 import numpy as np
-from session_directory import find_mouse_sessions
+from session_directory import get_session
 from microscoPy_load import cell_reg
 
 
@@ -42,8 +42,8 @@ def get_best_cells(rfe_obj):
 
 
 def rfe_overlap(mouse, bin_size=2, predictor='traces'):
-    session_indices, _ = find_mouse_sessions(mouse)
-    session_indices = session_indices[[0, 1, 2, 4]]
+    session_indices, _ = get_session(mouse,
+                                     ('FC', 'E1_1', 'E2_1', 'RE_1'))
 
     rfe_objs, best_cells, = [], []
     for i,session in enumerate(session_indices):
@@ -70,4 +70,4 @@ def rfe_overlap(mouse, bin_size=2, predictor='traces'):
     pass
 
 if __name__ == '__main__':
-    rfe_overlap('Kerberos')
+    rfe_overlap('Kepler')

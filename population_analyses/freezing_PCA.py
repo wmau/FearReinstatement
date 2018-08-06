@@ -7,7 +7,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import data_preprocessing as d_pp
 from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as FF
 from scipy.stats import zscore, mode
-from session_directory import find_mouse_sessions
+from session_directory import get_session
 
 session_list = load_session_list()
 
@@ -63,9 +63,7 @@ def PCA_session(session_index, bin_length=1, dtype='traces'):
 
 def PCA_concatenated_sessions(mouse, bin_length=1, dtype='traces',
                               global_cell_idx=None, plot_flag=True):
-    sessions, _ = find_mouse_sessions(mouse)
-
-    sessions = sessions[[0, 1, 2, 4]]
+    sessions, _ = get_session(mouse, ('FC','E1_1','E2_1','RE_1'))
 
     neural_data, days, t, freezing = \
         d_pp.concatenate_sessions(sessions,
@@ -76,8 +74,8 @@ def PCA_concatenated_sessions(mouse, bin_length=1, dtype='traces',
     bins = d_pp.make_bins(t, bin_length*20)
     neural_data = d_pp.bin_time_series(neural_data, bins)
 
-    X = np.mean(np.asarray(neural_data[0:-1]), axis=2)
-    X = np.append(X, np.mean(neural_data[-1], axis=1)[None, :],
+    X = np.nanmean(np.asarray(neural_data[0:-1]), axis=2)
+    X = np.append(X, np.nanmean(neural_data[-1], axis=1)[None, :],
                   axis=0)
 
     # Bin freezing vector.
@@ -138,4 +136,4 @@ def PCA_concatenated_sessions(mouse, bin_length=1, dtype='traces',
 
 
 if __name__ == '__main__':
-    PCA_concatenated_sessions('Kerberos')
+    PCA_concatenated_sessions('Janus')

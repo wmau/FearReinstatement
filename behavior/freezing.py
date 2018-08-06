@@ -1,4 +1,4 @@
-from session_directory import load_session_list, find_mouse_sessions
+from session_directory import load_session_list, get_session
 from microscoPy_load.ff_video_fixer import load_session as load_ff
 import data_preprocessing as d_pp
 from microscoPy_load import calcium_events as ca_events
@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 session_list = load_session_list()
 
-def compute_percent_freezing(session_index, bin_length=100, plot_flag=False):
+def compute_percent_freezing(session_index, bin_length=60, plot_flag=False):
     session = load_ff(session_index)
     _, t = ca_events.load_events(session_index)
 
@@ -36,11 +36,12 @@ def compute_percent_freezing(session_index, bin_length=100, plot_flag=False):
 
     return percent_freezing, t_binned
 
-def plot_freezing_percentages(mouse, bin_length=100):
-    session_idx, _ = find_mouse_sessions(mouse)
-    session_idx = session_idx[[0,1,2,4]]
+def plot_freezing_percentages(mouse, bin_length=60):
+    session_idx, _ = get_session(mouse, ('FC','E1_1','E2_1','RE_1'))
 
-    _, ax = plt.subplots(1,4,sharey=True)
+    f, ax = plt.subplots(1,4,sharey=True)
+    manager = plt.get_current_fig_manager()
+    manager.window.setGeometry(2050,190,1000,270)
     titles = ['Fear conditioning', 'Ext1', 'Ext2', 'Recall']
     for i, session in enumerate(session_idx):
         p, t = compute_percent_freezing(session,bin_length=bin_length)
@@ -50,7 +51,8 @@ def plot_freezing_percentages(mouse, bin_length=100):
 
     ax[0].set_ylabel('% freezing')
 
-def plot_freezing(session_index):
+def plot_freezing(mouse, stages_tuple):
+    session_index, _ = get_session(mouse, stages_tuple)
     session = load_ff(session_index)
 
     t = d_pp.trim_session(session.imaging_t, session.mouse_in_cage)
@@ -67,6 +69,6 @@ def plot_freezing(session_index):
 
 
 if __name__ == '__main__':
-    plot_freezing_percentages('Nix')
+    plot_freezing_percentages('Kerberos')
 
     pass

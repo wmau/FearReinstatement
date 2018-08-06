@@ -1,6 +1,6 @@
 from os import path, rename
 from session_directory import load_session_list, find_mouse_directory, \
-    find_mouse_sessions
+    find_mouse_sessions, get_session
 import glob
 import h5py
 import numpy as np
@@ -150,7 +150,7 @@ def trim_match_map(match_map, session_indices, active_all_days=True):
     return trimmed_map
 
 
-def plot_footprints_over_days(session_index, neurons):
+def plot_footprints_over_days(mouse, stage_tuple, neurons):
     """
     Plots specified cells across all sessions.
     :param session_index:
@@ -158,6 +158,7 @@ def plot_footprints_over_days(session_index, neurons):
     :return:
     """
     # Get the mouse name.
+    session_index = get_session(mouse, stage_tuple)[0]
     mouse = session_list[session_index]["Animal"]
 
     # Load the footprints and map.
@@ -201,6 +202,21 @@ def plot_footprints_over_days(session_index, neurons):
     return f
 
 def find_cell_in_map(map, map_index, neurons):
+    """
+    Gets the global cell index of a set of cells given a column index
+    corresponding to the session for that mouse.
+
+    Parameters
+    ---
+    map: from load_cellreg_results.
+    map_index: scalar, column index, from find_match_map_index.
+    neurons: array-like, indices of cells from map_index session.
+
+    Returns
+    ---
+    global_cell_index: array-like, row index of map where the neurons
+    are found.
+    """
     _, global_cell_index = ismember(map[:, map_index], neurons)
 
     return global_cell_index.astype(int)
@@ -289,4 +305,4 @@ class CellRegObj:
 
 
 if __name__ == '__main__':
-    plot_footprints_over_days(0, [1, 2, 5])
+    plot_footprints_over_days('Kerberos','FC', [1, 2, 5])
