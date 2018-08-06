@@ -38,6 +38,7 @@ def make_session_list(csv_directory):
                                         "Date": entry['Date'],
                                         "Location": entry['Location'],
                                         "Session": entry['Session'],
+                                        "Region": entry['Region'],
                                         "Notes": entry['Notes']})
 
     # Save.
@@ -69,6 +70,7 @@ def check_session(session_index):
     print("Date: " + session_list[session_index]["Date"])
     print("Session # that day: " + session_list[session_index]["Session"])
     print("Location: " + session_list[session_index]["Location"])
+    print("Region: " + session_list[session_index]["Region"])
     print("Notes: " + session_list[session_index]["Notes"])
 
 
@@ -123,6 +125,11 @@ def get_session_stage(stages_tuple):
 
     """
     session_list = load_session_list()
+
+    # Make string a tuple.
+    if isinstance(stages_tuple, str):
+        stages_tuple = (stages_tuple,)
+
     indices = []
     stages = []
     for session_stage in stages_tuple:
@@ -150,6 +157,7 @@ def get_session(mouse, stages_tuple):
     get_session_type() for valid inputs.
 
     Return
+    ---
     sessions: indices of session_list.
 
     """
@@ -162,8 +170,32 @@ def get_session(mouse, stages_tuple):
     stages = [stage for i, stage in zip(sessions_at_that_stage, stages)
               if i in mouse_sessions]
 
+    if len(sessions) is 1:
+        sessions = sessions[0]
+        stages = stages[0]
+
     return sessions, stages
 
 
+def get_region(mouse):
+    """
+    Gets the recording region for that mouse.
+
+    Parameters
+    ---
+    mouse: str, mouse name.
+
+    Return
+    ---
+    region: str, region name.
+    """
+    mouse_sessions = find_mouse_sessions(mouse)[0]
+    session_list = load_session_list()
+
+    region = session_list[mouse_sessions[0]]["Region"]
+
+    return region
+
+
 if __name__ == '__main__':
-    indices, stages = get_session('Kerberos',('E1_1', 'E2_1', 'RE_1'))
+    session_list = load_session_list()
