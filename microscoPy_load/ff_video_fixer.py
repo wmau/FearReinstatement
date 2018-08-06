@@ -6,7 +6,7 @@ import pygame
 import skvideo.io
 from skimage import color
 from pandas import read_csv
-from pickle import dump, load
+import pickle
 from PIL import Image
 import numpy as np
 import cv2
@@ -24,7 +24,7 @@ def load_session(session_index):
     position_path = path.join(directory, 'FreezeFrame', 'Position.pkl')
 
     with open(position_path, 'rb') as file:
-        FF = load(file)
+        FF = pickle.load(file)
 
     return FF
 
@@ -34,7 +34,7 @@ def load_movie(session_index):
     position_path = path.join(directory, 'FreezeFrame', 'Movie.pkl')
 
     with open(position_path, 'rb') as file:
-        FF = load(file)
+        FF = pickle.load(file)
 
     return FF
 
@@ -210,7 +210,7 @@ class FFObj:
             self.imaging_freezing[start_idx:end_idx] = True
 
     def detect_freezing(self, velocity_threshold=7,
-                        min_freeze_duration=5,
+                        min_freeze_duration=1.25,
                         plot_freezing=True):
         """
         Detect freezing epochs.
@@ -237,6 +237,9 @@ class FFObj:
             if self.video_t[stop] - self.video_t[start] < \
                     min_freeze_duration:
                 self.freezing[this_epoch[0]:this_epoch[1]] = False
+
+        self.min_freeze_duration = min_freeze_duration
+        self.velocity_threshold = velocity_threshold
 
         if plot_freezing:
             self.plot_freezing()
@@ -329,7 +332,7 @@ class FFObj:
         plt.plot(self.velocity)
 
     def process_video(self, smooth_sigma=6, mouse_threshold=0.15,
-                      velocity_threshold=7, min_freeze_duration=5,
+                      velocity_threshold=7, min_freeze_duration=1.25,
                       plot_freezing=True, manual_correct=True):
         """
         Main function for detecting mouse and correcting video.
@@ -362,7 +365,7 @@ class FFObj:
         movie_file = path.join(directory, 'Movie.pkl')
 
         with open(movie_file, 'wb') as output:
-            dump(self, output)
+            pickle.dump(self, output, protocol=pickle.HIGHEST_PROTOCOL)
 
         if hasattr(self, 'movie'):
             del self.movie
@@ -370,7 +373,7 @@ class FFObj:
             del self.f
 
         with open(self.location, 'wb') as output:
-            dump(self, output)
+            pickle.dump(self, output, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 class FrameSelector:
