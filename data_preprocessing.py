@@ -1,7 +1,8 @@
 import numpy as np
 from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, cell_reg, ff_video_fixer as ff
 from scipy.stats import zscore
-from session_directory import load_session_list
+from session_directory import load_session_list, get_session
+from helper_functions import find_closest
 
 session_list = load_session_list()
 
@@ -26,7 +27,8 @@ def load_and_trim(session_index, dtype='traces', neurons=None):
 
     if dtype == 'traces':
         data, t = ca_traces.load_traces(session_index)
-        data = zscore(data, axis=1)
+        masked = np.ma.masked_invalid(data)
+        data = zscore(masked, axis=1)
     elif dtype == 'events':
         data, t = ca_events.load_events(session_index)
     elif dtype == 'freezing':
@@ -59,20 +61,34 @@ def bin_time_series(data, bins):
 
     return binned_data
 
-def trim_and_bin(session_index, dtype='trace', neurons=None,
-                 samples_per_bin=200):
+def trim_and_bin(session_index, dtype='traces', neurons=None,
+                 samples_per_bin=200, mask=None):
     session = ff.load_session(session_index)
 
-    if dtype == 'trace':
+    if dtype == 'traces':
         data, t = ca_traces.load_traces(session_index)
-        data = zscore(data, axis=1)
+        masked = np.ma.masked_invalid(data)
+        data = zscore(masked, axis=1)
+    elif dtype == 'events':
+        data, t = ca_events.load_events(session_index)
+        data[data > 0] = 1
+    else:
+        raise ValueError('Wrong data type.')
 
     if neurons is not None:
         data = data[neurons]
 
-    # Trim away home cage epochs.
-    t = trim_session(t, session.mouse_in_cage)
-    data = trim_session(data, session.mouse_in_cage)
+    # Make mask for trimming. If from_this_time is None, just use the
+    # entire session starting from when the mouse enters the chamber.
+    # Otherwise, start from the specified time until when the mouse
+    # leaves.
+    if mask is None:
+        mask = session.mouse_in_cage
+
+    # Trim away home cage epochs or starting from some other specified
+    # time point.
+    t = trim_session(t, mask)
+    data = trim_session(data, mask)
 
     # Bin time series.
     bins = make_bins(t, samples_per_bin)
@@ -107,7 +123,8 @@ def concatenate_sessions(sessions, include_homecage=False, dtype='traces',
         else:
             if dtype == 'traces':
                 data, t = ca_traces.load_traces(session)
-                data = zscore(data, axis=1)
+                masked = np.ma.masked_invalid(data)
+                data = zscore(masked, axis=1)
             elif dtype == 'events':
                 data, t = ca_events.load_events(session)
             else:
@@ -137,5 +154,40 @@ def concatenate_sessions(sessions, include_homecage=False, dtype='traces',
 
     return neural_data, all_days, all_t, all_freezing
 
+def get_avg_event_rate(mouse, stage, bin_size=1,
+                       neurons=None, mask=None):
+    """
+    Computes the average event rate (events/s) for each cell after
+    binning.
+
+    Parameters
+    ---
+    mouse: string, name of mouse.
+    stage: string, session stage.
+    bin_size: scalar, size of bin in seconds.
+    mask: boolean array, mask for which timestamps to consider.
+    from which to start computing.
+
+    Return
+    ---
+    avg_event_rate: (N,) ndarray containing values for average event
+    rate of each cell.
+
+    """
+    # Get session number.
+    session_index = get_session(mouse, stage)[0]
+
+    # Trim and bin.
+    samples_per_bin = bin_size*20
+    data, t, bins = trim_and_bin(session_index, dtype='events',
+                                 samples_per_bin=samples_per_bin,
+                                 mask=mask, neurons=neurons)
+
+    # Compute average event rate.
+    event_rates = [np.mean(neuron, axis=1) for neuron in data]
+    avg_event_rates = np.mean(np.asarray(event_rates).T, axis=1)
+
+    return avg_event_rates
+
 if __name__ == '__main__':
-    concatenate_sessions([0,1,2,4])
+    get_avg_event_rate('Kerberos','FC')
