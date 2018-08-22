@@ -61,19 +61,38 @@ def bin_time_series(data, bins):
 
     return binned_data
 
-def trim_and_bin(session_index, dtype='traces', neurons=None,
-                 samples_per_bin=200, mask=None):
-    session = ff.load_session(session_index)
+def trim_and_bin(session_index, data=None, t=None, session=None, dtype='traces',
+                 neurons=None, samples_per_bin=200, mask=None):
+    """
+    Trims and bins imaging from a session.
 
-    if dtype == 'traces':
-        data, t = ca_traces.load_traces(session_index)
-        masked = np.ma.masked_invalid(data)
-        data = zscore(masked, axis=1)
-    elif dtype == 'events':
-        data, t = ca_events.load_events(session_index)
-        data[data > 0] = 1
-    else:
-        raise ValueError('Wrong data type.')
+    Parameters
+    ---
+    session: int, session number OR FFObj from load_session.
+    dtype: str, 'traces' or 'events'.
+    neurons: list, neuron indices.
+    samples_per_bin: int, # of samples per bin.
+    mask: boolean array.
+
+    Returns
+    ---
+    data: (N,B) array, trimmed and binned matrix.
+    t: (B,) array, trimmed and binned time vector.
+    bins: (B,) array, indices for bin boundaries.
+    """
+    if session is None:
+        session = ff.load_session(session_index)
+
+    if data is None:
+        if dtype == 'traces':
+            data, t = ca_traces.load_traces(session_index)
+            masked = np.ma.masked_invalid(data)
+            data = zscore(masked, axis=1)
+        elif dtype == 'events':
+            data, t = ca_events.load_events(session_index)
+            data[data > 0] = 1
+        else:
+            raise ValueError('Wrong data type.')
 
     if neurons is not None:
         data = data[neurons]
@@ -154,7 +173,8 @@ def concatenate_sessions(sessions, include_homecage=False, dtype='traces',
 
     return neural_data, all_days, all_t, all_freezing
 
-def get_avg_event_rate(mouse, stage, bin_size=1,
+def get_avg_event_rate(mouse, stage, bin_size=1, data=None,
+                       t=None, session=None,
                        neurons=None, mask=None):
     """
     Computes the average event rate (events/s) for each cell after
@@ -165,6 +185,7 @@ def get_avg_event_rate(mouse, stage, bin_size=1,
     mouse: string, name of mouse.
     stage: string, session stage.
     bin_size: scalar, size of bin in seconds.
+    session: FFObj, from load_session.
     mask: boolean array, mask for which timestamps to consider.
     from which to start computing.
 
@@ -179,13 +200,15 @@ def get_avg_event_rate(mouse, stage, bin_size=1,
 
     # Trim and bin.
     samples_per_bin = bin_size*20
-    data, t, bins = trim_and_bin(session_index, dtype='events',
+    data, t, bins = trim_and_bin(session_index, session=session,
+                                 data=data, t=t,
+                                 dtype='events',
                                  samples_per_bin=samples_per_bin,
                                  mask=mask, neurons=neurons)
 
     # Compute average event rate.
-    event_rates = [np.mean(neuron, axis=1) for neuron in data]
-    avg_event_rates = np.mean(np.asarray(event_rates).T, axis=1)
+    event_rates = [np.nanmean(neuron, axis=1) for neuron in data]
+    avg_event_rates = np.nanmean(np.asarray(event_rates).T, axis=1)
 
     return avg_event_rates
 
