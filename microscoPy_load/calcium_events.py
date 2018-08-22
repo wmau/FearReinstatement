@@ -106,7 +106,10 @@ def load_events(session_index):
 
         traces, t = ca_traces.load_traces(session_index)
 
+        # Make all dropped frames nans.
+        dropped_frames = np.all(np.isnan(traces), axis=0)
         events = np.zeros(traces.shape)
+        events[:, dropped_frames] = np.nan
 
         for cell, timestamps in enumerate(event_times):
             for i, this_time in enumerate(timestamps):
