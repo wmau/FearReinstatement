@@ -1,88 +1,278 @@
-from population_analyses.freezing_classifier import classify_cross_session
-import numpy as np
-from single_cell_analyses.footshock import ShockSequence
-from microscoPy_load.calcium_events import load_events
-import random
-from session_directory import get_session_stage, get_session, get_region
-from sklearn.svm import SVC
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-from sklearn.linear_model import LogisticRegression
-from sklearn.neural_network import MLPClassifier
-from sklearn.tree import DecisionTreeClassifier
-from pandas import MultiIndex
-import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
 import statsmodels
-import statsmodels.api as sm
+from pandas import MultiIndex
 from statsmodels.formula.api import ols
-from scipy.stats import ttest_ind, ttest_rel
+from population_analyses.freezing_classifier import classify_cross_session
+from session_directory import get_session, \
+    get_region, load_session_list
+from single_cell_analyses.event_rate_correlations import time_lapse_corr
+from helper_functions import ismember, nan, bool_array
+from scipy.stats import pearsonr, spearmanr, ttest_ind, \
+    ttest_rel, ranksums
+from plotting.plot_functions import scatter_box
 
-def CompareShockCellDecoderContribution():
+session_list = load_session_list()
 
-    bin_length = 2
-    session_1 = [0, 5, 10, 15]
-    session_2 = [[1, 2, 4], [6, 7, 9], [11, 12, 14], [16, 17, 19]]
-    all_sessions = [[0, 1, 2, 4], [5, 6, 7, 9], [10, 11, 12, 14],
-                    [15, 16, 17, 19]]
+# Specify mice and days to be included in analysis.
+mice = ('Kerberos',
+        'Nix',
+        'Titan',
+        'Hyperion',
+        'Calypso',
+        'Pandora',
+        'Janus',
+        'Kepler',
+        'Mundilfari',
+        )
 
-    scores_with = np.zeros((len(session_1),3))
-    scores_without = np.zeros((len(session_1),3))
-    scores_without_random = np.zeros((len(session_1),3))
+days = ('E1_1',
+        'E2_1',
+        'RE_1',
+        'E1_2',
+        'E2_2',
+        'RE_2',
+        )
 
-    for i, fc in enumerate(session_1):
-        S = ShockSequence(fc)
-        shock_neurons = S.shock_modulated_cells
+regions = [get_region(mouse) for mouse in mice]
 
-        events, _ = load_events(fc)
-        neurons = list(range(len(events)))
-        shock_neurons_omitted = list(set(neurons).difference(shock_neurons))
+# Set up.
+n_mice = len(mice)
+n_days = len(days)
 
-        neurons_to_omit = random.sample(shock_neurons_omitted,
-                                        len(shock_neurons))
-        random_neurons_omitted = list(set(neurons).difference(neurons_to_omit))
+# Preallocate.
+session_1 = [get_session(mouse, 'FC')[0]
+             for mouse in mice]
+session_2 = [get_session(mouse, days)[0]
+             for mouse in mice]
+session_2_stages = [get_session(mouse, days)[1]
+                    for mouse in mice]
 
-        for j, ext in enumerate(session_2[i]):
-            scores_with[i,j], _, _ = \
-                classify_cross_session(fc, ext, bin_length=bin_length,
-                                       neurons=shock_neurons)
 
-            scores_without[i,j], _, _ = \
-                classify_cross_session(fc, ext, bin_length=bin_length,
-                                       neurons=shock_neurons_omitted)
+def Fix_Calypso_E2b():
+    import os
+    import csv
 
-            scores_without_random[i,j], _, _ = \
-                classify_cross_session(fc, ext, bin_length=bin_length,
-                                       neurons=random_neurons_omitted)
+    session = get_session('Calypso','E2_1')[0]
+
+    filename = os.path.join(session_list[session]["Location"],
+                            "Events.csv")
+    new_name = os.path.join(session_list[session]["Location"],
+                            "New_Events.csv")
+
+    r = csv.reader(open(filename, 'r'))
+
+    lines = list(r)
+
+    for i, row in enumerate(lines):
+        try:
+            t = float(row[0])
+            if t > 888.9:
+                new_value = round(t - 3939.517, 2)
+                lines[i][0] = str(new_value)
+        except:
+            pass
+
+    writer = csv.writer(open(new_name, 'w', newline=''))
+    writer.writerows(lines)
+
+
+def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
+                              ref_mask_start=None, corr=pearsonr):
+    # Get correlations and session identities.
+    correlations = []
+    mouse_id = []
+    session_id = []
+    for i, mouse in enumerate(mice):
+        for session in session_2_stages[i]:
+            correlations.append(time_lapse_corr(mouse, session,
+                                                bin_size=bin_size,
+                                                slice_size=slice_size,
+                                                ref_mask_start=ref_mask_start,
+                                                plot_flag=False,
+                                                corr=corr))
+            mouse_id.append(mouse)
+            session_id.append(session)
+
+    # Arrange correlations nicely into a (mouse, time) array.
+    max_sizes = []
+    for day in days:
+        # The mice are in the chambers for different lengths of time, even
+        # for the same session type (+/- 1 min). Find the largest session
+        # and use that size to build the matrix. Pad everything else with
+        # nans.
+        idx = np.where(ismember(day, session_id)[0])[0]
+        max_sizes.append(np.max([len(correlations[i]) for i in idx]))
+
+    # Preallocate a column array. We'll use this to append our session
+    # matrices to.
+    all_correlations = nan((n_mice,1))
+    for i, day in enumerate(days):
+        # Make a nan matrix whose length is the longest session of that
+        # type.
+        stacked_correlations = nan((n_mice, max_sizes[i]))
+
+        for j, mouse in enumerate(mice):
+            # For each mouse, get the session and fill the matrix row.
+            # If that session doesn't exist, skip it.
+            try:
+                # Get the index for that session, which is the intersect
+                # between the mouse and session type.
+                idx = list(set(np.where(ismember(day, session_id)[0])[0]) & \
+                           set([k for k, x in enumerate(mouse_id) if x == mouse]))[0]
+                c = correlations[idx]
+
+                stacked_correlations[j, :len(c)] = c
+            except:
+                pass
+
+        # Append the matrix along columns.
+        all_correlations = np.append(all_correlations,
+                                     stacked_correlations, axis=1)
+
+    # Delete the first column, which was used to append.
+    all_correlations = np.delete(all_correlations, 0, axis=1)
+
+    # Get indices for each session type.
+    session_boundaries = np.cumsum(max_sizes)
+    E1_1 = bool_array(all_correlations.shape[1],
+                      range(session_boundaries[0]))
+    E2_1 = bool_array(all_correlations.shape[1],
+                      range(session_boundaries[0],
+                            session_boundaries[1]))
+    RE_1 = bool_array(all_correlations.shape[1],
+                      range(session_boundaries[1],
+                            session_boundaries[2]))
+    E1_2 = bool_array(all_correlations.shape[1],
+                      range(session_boundaries[2],
+                            session_boundaries[3]))
+    E2_2 = bool_array(all_correlations.shape[1],
+                      range(session_boundaries[3],
+                            session_boundaries[4]))
+    RE_2 = bool_array(all_correlations.shape[1],
+                      range(session_boundaries[4],
+                            session_boundaries[5]))
+
+    # Get indices for regions.
+    CA1_mice = ismember('CA1', regions)[0]
+    BLA_mice = ismember('BLA', regions)[0]
+
+    # Partition the matrix into BLA and CA1.
+    CA1 = all_correlations[CA1_mice]
+    BLA = all_correlations[BLA_mice]
+
+    # Get indices for context 1 and context 2.
+    context_1 = E1_1 | E2_1 | RE_1
+    context_2 = E1_2 | E2_2 | RE_2
+
+    context1_boundaries = session_boundaries[:3]
+    context2_boundaries = np.cumsum(max_sizes[3:])
+
+    # Plot time series of correlation coefficients for CA1.
+    f, ax = plt.subplots(2, 2)
+    ax[0, 0].plot(CA1[:, context_1].T)
+    ax[0, 0].plot(np.nanmean(CA1[:, context_1], axis=0),
+                  linewidth=2, color='k')
+    for boundary in context1_boundaries:
+        ax[0, 0].axvline(x=boundary)
+
+    ax[0,0].set_xlabel('Time')
+    ax[0,0].set_ylabel('Correlation Coefficient')
+    ax[0,0].set_title('CA1')
+
+    # Plot time series of correlation coefficients for BLA.
+    ax[0,1].plot(BLA[:, context_1].T)
+    ax[0,1].plot(np.nanmean(BLA[:, context_1], axis=0),
+             linewidth=2, color='k')
+    for boundary in context1_boundaries:
+        ax[0, 1].axvline(x=boundary)
+
+    ax[0,1].set_xlabel('Time')
+    ax[0,1].set_title('BLA')
+
+    # Boxplot by session type for CA1.
+    data = [CA1[:, E1_1].flatten(),
+            CA1[:, E2_1].flatten(),
+            CA1[:, RE_1].flatten()]
+    data = [x[~np.isnan(x)] for x in data]
+    scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'],
+                ylabel='Correlation Coefficient', ax=ax[1,0])
+
+    # Boxplot by session type for BLA.
+    data = [BLA[:, E1_1].flatten(),
+            BLA[:, E2_1].flatten(),
+            BLA[:, RE_1].flatten()]
+    data = [x[~np.isnan(x)] for x in data]
+    scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1,1])
+
+
+    ###
+    f, ax = plt.subplots(2, 2)
+    ax[0, 0].plot(CA1[:, context_2].T)
+    ax[0, 0].plot(np.nanmean(CA1[:, context_2], axis=0),
+                  linewidth=2, color='k')
+    for boundary in context2_boundaries:
+        ax[0, 0].axvline(x=boundary)
+
+    ax[0,0].set_xlabel('Time')
+    ax[0,0].set_ylabel('Correlation Coefficient')
+    ax[0,0].set_title('CA1')
+
+    # Plot time series of correlation coefficients for BLA.
+    ax[0,1].plot(BLA[:, context_2].T)
+    ax[0,1].plot(np.nanmean(BLA[:, context_2], axis=0),
+             linewidth=2, color='k')
+    for boundary in context2_boundaries:
+        ax[0, 1].axvline(x=boundary)
+
+    ax[0,1].set_xlabel('Time')
+    ax[0,1].set_title('BLA')
+
+    # Boxplot by session type for CA1.
+    data = [CA1[:, E1_2].flatten(),
+            CA1[:, E2_2].flatten(),
+            CA1[:, RE_2].flatten()]
+    data = [x[~np.isnan(x)] for x in data]
+    scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'],
+                ylabel='Correlation Coefficient', ax=ax[1,0])
+
+    # Boxplot by session type for BLA.
+    data = [BLA[:, E1_2].flatten(),
+            BLA[:, E2_2].flatten(),
+            BLA[:, RE_2].flatten()]
+    data = [x[~np.isnan(x)] for x in data]
+    scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1,1])
+
+
+    E1_E2_CA1 = ranksums(CA1[:, E1_1].flatten(),
+                         CA1[:, E2_1].flatten())[1]
+
+    E1_RE_CA1 = ranksums(CA1[:, E1_1].flatten(),
+                         CA1[:, RE_1].flatten())[1]
+
+    E2_RE_CA1 = ranksums(CA1[:, E2_1].flatten(),
+                         CA1[:, RE_1].flatten())[1]
+
+    E1_E2_BLA = ranksums(BLA[:, E1_1].flatten(),
+                         BLA[:, E2_1].flatten())[1]
+
+    E1_RE_BLA = ranksums(BLA[:, E1_1].flatten(),
+                         BLA[:, RE_1].flatten())[1]
+
+    E2_RE_BLA = ranksums(BLA[:, E2_1].flatten(),
+                         BLA[:, RE_1].flatten())[1]
+
+
+
+
+    plt.show()
+    pass
 
 
 def CrossSessionClassify(bin_length = 1, I = 100,
                          classifier=None,
                          predictor='traces', shuffle='scramble'):
-
-    # Specify mice and days to be included in analysis.
-    mice = ('Kerberos',
-            'Nix',
-            'Hyperion',
-            'Calypso',
-            'Pandora',
-            'Janus',
-            'Kepler',
-            )
-
-    days = ('E1_1',
-            'E2_1',
-            'RE_1',
-            'E1_2',
-            'E2_2',
-            'RE_2',
-             )
-
-    # Get region for each mouse.
-    regions = [get_region(mouse) for mouse in mice]
-
-    # Set up.
-    n_mice = len(mice)
-    n_days = len(days)
 
     scores, pvals = np.empty((n_mice,n_days)), \
                     np.empty((n_mice,n_days))
@@ -90,12 +280,6 @@ def CrossSessionClassify(bin_length = 1, I = 100,
     scores.fill(np.nan)
     pvals.fill(np.nan)
     permuted.fill(np.nan)
-
-    # Preallocate.
-    session_1 = [get_session(mouse,'FC')[0]
-                 for mouse in mice]
-    session_2 = [get_session(mouse,days)[0]
-                 for mouse in mice]
 
     # Find scores and p-values.
     for mouse, train_session in enumerate(session_1):
@@ -219,4 +403,4 @@ def CrossSessionClassify(bin_length = 1, I = 100,
     return scores, pvals, permuted
 
 if __name__ == '__main__':
-    CrossSessionClassify()
+    CrossSessionEventRateCorr()

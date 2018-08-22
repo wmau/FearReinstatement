@@ -5,10 +5,12 @@ from helper_functions import find_closest
 import numpy as np
 import matplotlib.pyplot as plt
 import microscoPy_load.cell_reg as cell_reg
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, spearmanr
+import microscoPy_load.calcium_events as ca_events
 
 def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
-                    slice_size=60, ref_mask_start=None):
+                    slice_size=60, ref_mask_start=None, plot_flag=True,
+                    corr=spearmanr):
     """
     Takes the reference session and computes the average event rate for
     each cell during that session. Then correlate those rates to rates
@@ -24,14 +26,18 @@ def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
     slice_size: scalar, size of slices of sessions, in seconds.
     ref_mask_start: scalar, timestamp from which to calculate reference
     firing rate vector, from start of session.
+    plot_flag: boolean, whether to plot correlation vector.
     """
-    session_indices = get_session(mouse, (ref_session, session))[0]
+
+    session_index = get_session(mouse, (ref_session, session))[0]
 
     # If ref_mask_start is a scalar, clip the time series starting from
     # the specified timestamp.
-    if ref_mask_start is not None:
-        ff_ref = load_session(session_indices[0])
+    ff_ref = load_session(session_index[0])
+    data, t = ca_events.load_events(session_index[0])
+    data[data > 0] = 1
 
+    if ref_mask_start is not None:
         ref_mask = np.zeros(ff_ref.mouse_in_cage.shape, dtype=bool)
         start_idx = find_closest(ff_ref.imaging_t, ref_mask_start)[1]
         end_idx = np.where(ff_ref.mouse_in_cage)[0][-1]
@@ -40,18 +46,22 @@ def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
         ref_mask = None
 
     map = cell_reg.load_cellreg_results(mouse)
-    trimmed_map = cell_reg.trim_match_map(map, session_indices)
+    trimmed_map = cell_reg.trim_match_map(map, session_index)
     ref_neurons = trimmed_map[:,0]
     neurons = trimmed_map[:,1]
 
     # Get average event rates from the reference session.
     ref_event_rates = d_pp.get_avg_event_rate(mouse, ref_session,
+                                              data=data, t=t,
+                                              session=ff_ref,
                                               bin_size=bin_size,
                                               mask=ref_mask,
                                               neurons=ref_neurons)
 
     # Load other session.
-    ff_session = load_session(session_indices[1])
+    ff_session = load_session(session_index[1])
+    data, t = ca_events.load_events(session_index[1])
+    data[data > 0] = 1
 
     # Get indices for when the mouse is in the chamber, then slice them.
     in_cage = np.where(ff_session.mouse_in_cage)[0]
@@ -64,19 +74,31 @@ def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
     for i, indices in enumerate(binned_in_cage):
         masks[i,indices] = True
 
-    event_rates = []
-    for mask in masks:
-        event_rates.append(d_pp.get_avg_event_rate(mouse, session,
+    event_rates = np.zeros((masks.shape[0], len(neurons)))
+    for i, mask in enumerate(masks):
+        event_rates[i,:] = d_pp.get_avg_event_rate(mouse, session,
+                                                   data=data, t=t,
+                                                   session=ff_session,
                                                    bin_size=bin_size,
                                                    mask=mask,
-                                                   neurons=neurons))
+                                                   neurons=neurons)
 
     correlations = np.zeros((len(event_rates)))
     for i, vector in enumerate(event_rates):
-        correlations[i] = pearsonr(vector, ref_event_rates)[0]
+        correlations[i] = corr(vector, ref_event_rates)[0]
 
-    plt.plot(correlations[0:-1])
-    plt.show()
-    pass
-if __name__ == '__main__':
-    time_lapse_corr('Pandora','E2_1')
+    if plot_flag:
+        plt.plot(correlations[0:-1])
+        plt.show()
+
+    return correlations
+
+# if __name__ == '__main__':
+    # import cProfile
+    # cp = cProfile.Profile()
+    # cp.enable()
+    # time_lapse_corr('Mundilfari','E1_1')
+    # cp.disable()
+    # cp.print_stats()
+    #
+    # pass
