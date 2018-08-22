@@ -73,3 +73,38 @@ def get_event_rate(events):
 
     return event_rate
 
+def nan(size):
+    """
+    Makes nan array.
+
+    Parameter
+    ---
+    size: tuple.
+
+    Return
+    a: nan array.
+    """
+
+    a = np.empty(size)
+    a.fill(np.nan)
+
+    return a
+
+def bool_array(size, trues):
+    """
+    Makes a boolean array that's true where indicated.
+
+    Parameters
+    ---
+    size: int OR tuple, size of the array.
+    trues: list OR int OR tuple of lists, true values.
+
+    Return
+    ---
+    arr: boolean array.
+
+    """
+    arr = np.zeros(size, dtype=bool)
+    arr[trues] = True
+
+    return arr

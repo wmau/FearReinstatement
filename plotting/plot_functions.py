@@ -118,3 +118,23 @@ def plot_raster(obj):
     obj.ax.set_xlim([-obj.window, 0])
 
     obj.last_position = len(obj.events) - 1
+
+def scatter_box(data, ax=None, f=None, xlabels=None, ylabel=None,
+                spread=0.04, alpha=0.1, box_color='k'):
+    if ax is None:
+        f, ax = plt.subplots()
+
+    ax.boxplot(data, whis=[5,95], sym='',
+               medianprops=dict(color=box_color))
+
+    for i, group in enumerate(data):
+        x = np.random.normal(i+1, spread, size=len(group))
+        ax.scatter(x, group, alpha=alpha, s=5, c='k')
+
+    if xlabels is not None:
+        ax.set_xticklabels(xlabels)
+
+    if ylabel is not None:
+        ax.set_ylabel(ylabel)
+
+    return f, ax
