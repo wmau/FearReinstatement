@@ -123,6 +123,8 @@ def preprocess_cross_session(train_session, test_session,
     assert mouse == session_list[test_session]["Animal"], \
         "Mouse names don't match!"
 
+    print('Fitting ' + str(train_session) + ' ' + str(test_session))
+
     # Trim and bin data from both sessions.
     X_train, y_train = preprocess(train_session, bin_length=bin_length,
                                   predictor=predictor,
