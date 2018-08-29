@@ -3,28 +3,29 @@ import numpy as np
 import seaborn as sns
 import statsmodels
 from pandas import MultiIndex
+from scipy.stats import pearsonr, mannwhitneyu
 from statsmodels.formula.api import ols
+from statsmodels.stats.anova import anova_lm
+from statsmodels.stats.multitest import fdrcorrection
+from helper_functions import ismember, nan, bool_array
+from plotting.plot_functions import scatter_box
 from population_analyses.freezing_classifier import classify_cross_session
 from session_directory import get_session, \
     get_region, load_session_list
 from single_cell_analyses.event_rate_correlations import time_lapse_corr
-from helper_functions import ismember, nan, bool_array
-from scipy.stats import pearsonr, spearmanr, ttest_ind, \
-    ttest_rel, ranksums
-from plotting.plot_functions import scatter_box
 
 session_list = load_session_list()
 
 # Specify mice and days to be included in analysis.
 mice = ('Kerberos',
         'Nix',
-        'Titan',
-        'Hyperion',
         'Calypso',
+        'Hyperion',
         'Pandora',
         'Janus',
         'Kepler',
         'Mundilfari',
+        'Aegir',
         )
 
 days = ('E1_1',
@@ -54,7 +55,7 @@ def Fix_Calypso_E2b():
     import os
     import csv
 
-    session = get_session('Calypso','E2_1')[0]
+    session = get_session('Calypso', 'E2_1')[0]
 
     filename = os.path.join(session_list[session]["Location"],
                             "Events.csv")
@@ -69,7 +70,7 @@ def Fix_Calypso_E2b():
         try:
             t = float(row[0])
             if t > 888.9:
-                new_value = round(t - 3939.517, 2)
+                new_value = round(t - 3838.707, 2)
                 lines[i][0] = str(new_value)
         except:
             pass
@@ -107,7 +108,7 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
 
     # Preallocate a column array. We'll use this to append our session
     # matrices to.
-    all_correlations = nan((n_mice,1))
+    all_correlations = nan((n_mice, 1))
     for i, day in enumerate(days):
         # Make a nan matrix whose length is the longest session of that
         # type.
@@ -176,20 +177,19 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
                   linewidth=2, color='k')
     for boundary in context1_boundaries:
         ax[0, 0].axvline(x=boundary)
-
-    ax[0,0].set_xlabel('Time')
-    ax[0,0].set_ylabel('Correlation Coefficient')
-    ax[0,0].set_title('CA1')
+    ax[0, 0].set_xlabel('Time')
+    ax[0, 0].set_ylabel('Correlation Coefficient')
+    ax[0, 0].set_title('CA1')
 
     # Plot time series of correlation coefficients for BLA.
-    ax[0,1].plot(BLA[:, context_1].T)
-    ax[0,1].plot(np.nanmean(BLA[:, context_1], axis=0),
-             linewidth=2, color='k')
+    ax[0, 1].plot(BLA[:, context_1].T)
+    ax[0, 1].plot(np.nanmean(BLA[:, context_1], axis=0),
+                  linewidth=2, color='k')
     for boundary in context1_boundaries:
         ax[0, 1].axvline(x=boundary)
 
-    ax[0,1].set_xlabel('Time')
-    ax[0,1].set_title('BLA')
+    ax[0, 1].set_xlabel('Time')
+    ax[0, 1].set_title('BLA')
 
     # Boxplot by session type for CA1.
     data = [CA1[:, E1_1].flatten(),
@@ -197,15 +197,14 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
             CA1[:, RE_1].flatten()]
     data = [x[~np.isnan(x)] for x in data]
     scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'],
-                ylabel='Correlation Coefficient', ax=ax[1,0])
+                ylabel='Correlation Coefficient', ax=ax[1, 0])
 
     # Boxplot by session type for BLA.
     data = [BLA[:, E1_1].flatten(),
             BLA[:, E2_1].flatten(),
             BLA[:, RE_1].flatten()]
     data = [x[~np.isnan(x)] for x in data]
-    scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1,1])
-
+    scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1, 1])
 
     ###
     f, ax = plt.subplots(2, 2)
@@ -215,19 +214,19 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     for boundary in context2_boundaries:
         ax[0, 0].axvline(x=boundary)
 
-    ax[0,0].set_xlabel('Time')
-    ax[0,0].set_ylabel('Correlation Coefficient')
-    ax[0,0].set_title('CA1')
+    ax[0, 0].set_xlabel('Time')
+    ax[0, 0].set_ylabel('Correlation Coefficient')
+    ax[0, 0].set_title('CA1')
 
     # Plot time series of correlation coefficients for BLA.
-    ax[0,1].plot(BLA[:, context_2].T)
-    ax[0,1].plot(np.nanmean(BLA[:, context_2], axis=0),
-             linewidth=2, color='k')
+    ax[0, 1].plot(BLA[:, context_2].T)
+    ax[0, 1].plot(np.nanmean(BLA[:, context_2], axis=0),
+                  linewidth=2, color='k')
     for boundary in context2_boundaries:
         ax[0, 1].axvline(x=boundary)
 
-    ax[0,1].set_xlabel('Time')
-    ax[0,1].set_title('BLA')
+    ax[0, 1].set_xlabel('Time')
+    ax[0, 1].set_title('BLA')
 
     # Boxplot by session type for CA1.
     data = [CA1[:, E1_2].flatten(),
@@ -235,48 +234,50 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
             CA1[:, RE_2].flatten()]
     data = [x[~np.isnan(x)] for x in data]
     scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'],
-                ylabel='Correlation Coefficient', ax=ax[1,0])
+                ylabel='Correlation Coefficient', ax=ax[1, 0])
 
     # Boxplot by session type for BLA.
     data = [BLA[:, E1_2].flatten(),
             BLA[:, E2_2].flatten(),
             BLA[:, RE_2].flatten()]
     data = [x[~np.isnan(x)] for x in data]
-    scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1,1])
+    scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1, 1])
 
+    CA1_E1_1 = CA1[:, E1_1].flatten()
+    CA1_E1_1 = CA1_E1_1[~np.isnan(CA1_E1_1)]
 
-    E1_E2_CA1 = ranksums(CA1[:, E1_1].flatten(),
-                         CA1[:, E2_1].flatten())[1]
+    CA1_E2_1 = CA1[:, E2_1].flatten()
+    CA1_E2_1 = CA1_E2_1[~np.isnan(CA1_E2_1)]
 
-    E1_RE_CA1 = ranksums(CA1[:, E1_1].flatten(),
-                         CA1[:, RE_1].flatten())[1]
+    CA1_RE_1 = CA1[:, RE_1].flatten()
+    CA1_RE_1 = CA1_RE_1[~np.isnan(CA1_RE_1)]
 
-    E2_RE_CA1 = ranksums(CA1[:, E2_1].flatten(),
-                         CA1[:, RE_1].flatten())[1]
+    BLA_E1_1 = BLA[:, E1_1].flatten()
+    BLA_E1_1 = BLA_E1_1[~np.isnan(BLA_E1_1)]
 
-    E1_E2_BLA = ranksums(BLA[:, E1_1].flatten(),
-                         BLA[:, E2_1].flatten())[1]
+    BLA_E2_1 = BLA[:, E2_1].flatten()
+    BLA_E2_1 = BLA_E2_1[~np.isnan(BLA_E2_1)]
 
-    E1_RE_BLA = ranksums(BLA[:, E1_1].flatten(),
-                         BLA[:, RE_1].flatten())[1]
+    BLA_RE_1 = BLA[:, RE_1].flatten()
+    BLA_RE_1 = BLA_RE_1[~np.isnan(BLA_RE_1)]
 
-    E2_RE_BLA = ranksums(BLA[:, E2_1].flatten(),
-                         BLA[:, RE_1].flatten())[1]
-
-
-
+    E1_E2_CA1 = mannwhitneyu(CA1_E1_1, CA1_E2_1).pvalue
+    E1_RE_CA1 = mannwhitneyu(CA1_E1_1, CA1_RE_1).pvalue
+    E2_RE_CA1 = mannwhitneyu(CA1_E2_1, CA1_RE_1).pvalue
+    E1_E2_BLA = mannwhitneyu(BLA_E1_1, BLA_E2_1).pvalue
+    E1_RE_BLA = mannwhitneyu(BLA_E1_1, BLA_RE_1).pvalue
+    E2_RE_BLA = mannwhitneyu(BLA_E2_1, BLA_RE_1).pvalue
 
     plt.show()
     pass
 
 
-def CrossSessionClassify(bin_length = 1, I = 100,
+def CrossSessionClassify(bin_length=1, I=100,
                          classifier=None,
                          predictor='traces', shuffle='scramble'):
-
-    scores, pvals = np.empty((n_mice,n_days)), \
-                    np.empty((n_mice,n_days))
-    permuted = np.empty((n_mice,n_days,I))
+    scores, pvals = np.empty((n_mice, n_days)), \
+                    np.empty((n_mice, n_days))
+    permuted = np.empty((n_mice, n_days, I))
     scores.fill(np.nan)
     pvals.fill(np.nan)
     permuted.fill(np.nan)
@@ -288,11 +289,11 @@ def CrossSessionClassify(bin_length = 1, I = 100,
         # neurons = trimmed[:,0]
         for session, test_session in enumerate(session_2[mouse]):
             score, permuted_scores, p_value = \
-            classify_cross_session(train_session, test_session,
-                                   bin_length=bin_length,
-                                   predictor=predictor, I=I,
-                                   classifier=classifier,
-                                   shuffle=shuffle)
+                classify_cross_session(train_session, test_session,
+                                       bin_length=bin_length,
+                                       predictor=predictor, I=I,
+                                       classifier=classifier,
+                                       shuffle=shuffle)
 
             scores[mouse, session] = score
             pvals[mouse, session] = p_value
@@ -302,15 +303,15 @@ def CrossSessionClassify(bin_length = 1, I = 100,
     day_label = np.tile(np.repeat(days, I), n_mice)
     day_label = np.concatenate([day_label, np.tile(days, n_mice)])
 
-    mouse_label = np.repeat(mice,I*n_days)
+    mouse_label = np.repeat(mice, I * n_days)
     mouse_label = np.concatenate([mouse_label,
                                   np.repeat(mice, n_days)])
 
-    condition_label = np.repeat("Shuffled", n_mice*n_days*I)
+    condition_label = np.repeat("Shuffled", n_mice * n_days * I)
     condition_label = np.concatenate([condition_label,
-                                    np.repeat("Real", n_mice*n_days)])
+                                      np.repeat("Real", n_mice * n_days)])
 
-    region_label = np.repeat(regions,I*n_days)
+    region_label = np.repeat(regions, I * n_days)
     region_label = np.concatenate([region_label,
                                    np.repeat(regions, n_days)])
 
@@ -323,18 +324,18 @@ def CrossSessionClassify(bin_length = 1, I = 100,
                                  day_label,
                                  condition_label,
                                  region_label],
-                                 names=['Accuracy',
-                                        'Mouse',
-                                        'Day',
-                                        'Condition',
-                                        'Region',
-                                         ]).to_frame(False)
+                                names=['Accuracy',
+                                       'Mouse',
+                                       'Day',
+                                       'Condition',
+                                       'Region',
+                                       ]).to_frame(False)
 
     # Plot distributions of shuffled decoder results with real result.
     f = sns.catplot(x="Day",
                     y="Accuracy",
                     col="Mouse",
-                    data=df.loc[df['Condition']=='Shuffled'],
+                    data=df.loc[df['Condition'] == 'Shuffled'],
                     kind="violin",
                     bw=.2,
                     col_wrap=True)
@@ -344,8 +345,8 @@ def CrossSessionClassify(bin_length = 1, I = 100,
     for i, mouse in enumerate(mice):
         sns.stripplot(x="Day",
                       y="Accuracy",
-                      data=df.loc[(df['Condition']=='Real') &
-                                  (df['Mouse']==mouse)],
+                      data=df.loc[(df['Condition'] == 'Real') &
+                                  (df['Mouse'] == mouse)],
                       jitter=False,
                       size=10,
                       marker='X',
@@ -372,8 +373,8 @@ def CrossSessionClassify(bin_length = 1, I = 100,
                                sort=False).sem()['Accuracy'].reset_index()
 
     # CA1.
-    CA1_real = (means['Condition']=='Real') & (means['Region']=='CA1')
-    CA1_shuffle = (means['Condition']=='Shuffled') & (means['Region']=='CA1')
+    CA1_real = (means['Condition'] == 'Real') & (means['Region'] == 'CA1')
+    CA1_shuffle = (means['Condition'] == 'Shuffled') & (means['Region'] == 'CA1')
 
     y_real = means.loc[CA1_real]['Accuracy']
     yerr_real = sems.loc[CA1_real]['Accuracy']
@@ -386,21 +387,24 @@ def CrossSessionClassify(bin_length = 1, I = 100,
     plt.errorbar(days[0:3], y_shuffle, yerr=yerr_shuffle)
 
     formula = 'Accuracy ~ C(Day) + C(Condition) + C(Day):C(Condition)'
-    #model = ols(formula, collapse_by_mouse).fit() # Pool across mice.
+    # model = ols(formula, collapse_by_mouse).fit() # Pool across mice.
     model = ols(formula,
-                one_context.loc[one_context['Region']=='CA1']).fit()
-    anova = statsmodels.stats.anova.anova_lm(model, type=2)
+                one_context.loc[one_context['Region'] == 'CA1']).fit()
+    anova = anova_lm(model, type=2)
 
     # Compare conditions individually.
-    y = one_context.loc[(one_context['Condition'] == 'Shuffled') &
-                        (one_context['Day'] == 'E1_1') &
-                        (one_context['Region'] == 'CA1')]['Accuracy']
-    x = one_context.loc[(one_context['Condition'] == 'Real') &
-                        (one_context['Day'] == 'E1_1') &
-                        (one_context['Region'] == 'CA1')]['Accuracy']
-
+    E1_CA1 = one_context.loc[(one_context['Condition'] == 'Real') &
+                             (one_context['Day'] == 'E1_1') &
+                             (one_context['Region'] == 'CA1')]['Accuracy']
+    E2_CA1 = one_context.loc[(one_context['Condition'] == 'Real') &
+                             (one_context['Day'] == 'E2_1') &
+                             (one_context['Region'] == 'CA1')]['Accuracy']
+    RE_CA1 = one_context.loc[(one_context['Condition'] == 'Real') &
+                             (one_context['Day'] == 'RE_1') &
+                             (one_context['Region'] == 'CA1')]['Accuracy']
     plt.show()
     return scores, pvals, permuted
 
+
 if __name__ == '__main__':
-    CrossSessionEventRateCorr()
+    CrossSessionClassify()
