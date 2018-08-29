@@ -15,7 +15,7 @@ import numpy as np
 master_directory = 'U:\Fear conditioning project_Mosaic2\SessionDirectories'
 
 
-def make_session_list(csv_directory):
+def make_session_list(csv_directory=master_directory):
     """
 
     Make a list of recording sessions by reading from an editable CSV found in

@@ -121,19 +121,41 @@ def plot_raster(obj):
 
 def scatter_box(data, ax=None, f=None, xlabels=None, ylabel=None,
                 spread=0.04, alpha=0.1, box_color='k'):
+    """
+    Plots a scatter and box plot overlaid.
+
+    Parameters
+    ---
+    data: list of arrays or lists, data to be plotted.
+    ax: Axes object, to plot on. If none (default), makes a new figure.
+    f: Figure object, see above.
+    xlabels: list of x axis labels.
+    ylabel: str, y axis label.
+    spread: scalar, x spread of scatter plot points.
+    alpha: scalar, transparency.
+    box_color: RGB or color str, color of box.
+
+    Returns
+    ---
+    f: Figure object.
+    ax: Axes object.
+
+    """
     if ax is None:
         f, ax = plt.subplots()
 
+    # Box plot.
     ax.boxplot(data, whis=[5,95], sym='',
                medianprops=dict(color=box_color))
 
+    # For each element in the list, scatter.
     for i, group in enumerate(data):
         x = np.random.normal(i+1, spread, size=len(group))
         ax.scatter(x, group, alpha=alpha, s=5, c='k')
 
+    # Label axes.
     if xlabels is not None:
         ax.set_xticklabels(xlabels)
-
     if ylabel is not None:
         ax.set_ylabel(ylabel)
 

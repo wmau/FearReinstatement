@@ -229,7 +229,7 @@ class FFObj:
 
         freezing_epochs = self.get_freezing_epochs()
 
-        # If any freezing epochs were less than ~3 seconds long, get rid of
+        # If any freezing epochs were less than ~1.25 seconds long, get rid of
         # them.
         for this_epoch in freezing_epochs:
             start = this_epoch[0]
