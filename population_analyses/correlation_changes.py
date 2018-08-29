@@ -9,8 +9,11 @@ from microscoPy_load import cell_reg
 from scipy.spatial import distance
 from session_directory import get_session
 from behavior.freezing import compute_percent_freezing
+from helper_functions import nan
+import pandas as pd
 
 session_list = load_session_list()
+
 
 def do_sliced_correlation(session_index, bin_length, neurons):
     traces, t, bins = d_pp.trim_and_bin(session_index, neurons=neurons,
@@ -76,29 +79,36 @@ def plot_corr_matrices(corr_matrices, order, clusters=None):
 
 
 def compute_matrices_across_days(session_1, session_2, bin_length=10,
-                                 neurons=None, n_clusters=5,
-                                 cluster_here=0):
+                                 neurons=None, n_clusters=0,
+                                 cluster_here=0, s1_full=True):
     # Load cell map.
     mouse = session_list[session_1]["Animal"]
+    session_stage = session_list[session_1]["Session"]
     assert mouse == session_list[session_2]["Animal"], "Mice don't match."
     match_map = cell_reg.load_cellreg_results(mouse)
-    map_idx = cell_reg.find_match_map_index((session_1, session_2))
 
     # If neurons are specified, narrow down the list.
     if neurons is not None:
+        map_idx = cell_reg.find_match_map_index((session_1, session_2))
+
         global_cell_idx = cell_reg.find_cell_in_map(match_map,
                                                     map_idx[0],
                                                     neurons)
         match_map = match_map[global_cell_idx]
 
     # Only take cells that persisted across the sessions.
-    match_map = cell_reg.trim_match_map(match_map, map_idx)
-    neurons_ref = match_map[:, 0]
-    neurons_test = match_map[:, 1]
+    trimmed_map = cell_reg.trim_match_map(match_map, (session_1, session_2))
+    neurons_ref = trimmed_map[:, 0]
+    neurons_test = trimmed_map[:, 1]
 
     # Do correlations on time slices.
-    corr_matrices_1, t = do_sliced_correlation(session_1, bin_length,
-                                               neurons_ref)
+    if s1_full:
+        corr_matrices_1 = pairwise_correlate_traces(session_1,
+                                                    neurons=neurons_ref)
+    else:
+        corr_matrices_1, t = do_sliced_correlation(session_1, bin_length,
+                                                   neurons_ref)
+
     corr_matrices_2, _ = do_sliced_correlation(session_2, bin_length,
                                                neurons_test)
 
@@ -130,7 +140,8 @@ def plot_matrices_across_days(mouse, stages_tuple, bin_length=10,
 
 
 def cosine_distance_between_matrices(session_1, session_2, bin_length=10,
-                                     neurons=None, ref_time=938):
+                                     neurons=None, ref_time=938,
+                                     s1_full=True):
     """
     Perform pairwise correlations between cells within days then
     linearize these matrices and get their cosine distance across
@@ -154,74 +165,99 @@ def cosine_distance_between_matrices(session_1, session_2, bin_length=10,
     corr_matrices_1, corr_matrices_2, order, clusters = \
         compute_matrices_across_days(session_1, session_2,
                                      bin_length=bin_length,
-                                     neurons=neurons, n_clusters=0)
+                                     neurons=neurons, n_clusters=0,
+                                     s1_full=s1_full)
 
     # Need the time bin containing the scalar ref_time. Slice up the
     # time vector the same way we did to get the correlation matrices.
     # Then find the time slice that ref_time is in.
-    _, t, _ = d_pp.trim_and_bin(session_1, samples_per_bin=bin_length*20)
-    for idx, time_slice in enumerate(t):
-        if ref_time in time_slice:
-            break
+    if not s1_full:
+        _, t, _ = d_pp.trim_and_bin(session_1, samples_per_bin=bin_length*20)
+        for idx, time_slice in enumerate(t):
+            if ref_time in time_slice:
+                break
 
-    # Flatten the correlation matrix at ref_time. Only take the upper
-    # triangle.
-    reference_matrix = corr_matrices_1[idx]
+        # Flatten the correlation matrix at ref_time. Only take the upper
+        # triangle.
+        reference_matrix = corr_matrices_1[idx]
+    else:
+        reference_matrix = corr_matrices_1
+
     reference_vector = reference_matrix[np.triu_indices_from(reference_matrix,
                                                              k=1)]
 
     # Get cosine distances.
-    distances = np.zeros(len(corr_matrices_2))
+    distances = nan(len(corr_matrices_2))
     for i, matrix in enumerate(corr_matrices_2):
         vector = matrix[np.triu_indices_from(matrix, k=1)]
-        distances[i] = distance.cosine(reference_vector, vector)
+        try:
+            distances[i] = distance.cosine(reference_vector, vector)
+        except:
+            pass
 
     similarity = -(distances-1)
     p_freezing, _ = compute_percent_freezing(session_2,
                                              bin_length=bin_length)
 
-    segment = np.asarray([np.asarray(range(len(similarity))),
-                          similarity]).T.reshape(-1, 1, 2)
-    segment = np.concatenate([segment[:-1], segment[1:]], axis=1)
+    return similarity, p_freezing
+
+def plot_cosine_distances(similarities, p_freezing):
+    is_nested = any(isinstance(i, np.ndarray) for i in similarities)
+    if is_nested:
+        n_sessions = len(similarities)
+    else:
+        n_sessions = 1
 
     # Plot.
-    f, ax = plt.subplots(1, 1)
+    f, ax = plt.subplots(1, n_sessions, sharey='all')
 
-    norm = plt.Normalize(0, 1)
-    line_to_draw = LineCollection(segment, cmap='OrRd', norm=norm)
-    line_to_draw.set_array(p_freezing)
+    for i, (similarity, p) in enumerate(zip(similarities, p_freezing)):
+        segment = np.asarray([np.asarray(range(len(similarity))),
+                              similarity]).T.reshape(-1, 1, 2)
+        segment = np.concatenate([segment[:-1], segment[1:]], axis=1)
 
-    line = ax.add_collection(line_to_draw)
-    plt.ylabel('Cosine similarity')
-    plt.xlabel('Time bin')
-    ax.set_xlim(0, len(similarity))
-    ax.set_ylim(np.nanmin(similarity), np.nanmax(similarity))
-    f.colorbar(line, ax=ax)
+        norm = plt.Normalize(0, 1)
+        line_to_draw = LineCollection(segment, cmap='OrRd', norm=norm)
+        line_to_draw.set_array(p)
 
-    return similarity
+        line = ax[i].add_collection(line_to_draw)
+        ax[i].set_ylabel('Cosine similarity')
+        ax[i].set_xlabel('Time bin')
+        ax[i].set_xlim(0, len(similarity))
+
+    maxes = []
+    mins = []
+    for similarity in similarities:
+        maxes.append(np.nanmax(similarity))
+        mins.append(np.nanmin(similarity))
+
+    ax[i].set_ylim(np.min(mins), np.max(maxes))
+    f.colorbar(line, ax=ax[i])
 
 
 def do_cosine_distance_analysis(mouse, bin_length=5, neurons=None,
-                                ref_time=938):
+                                ref_time=938, s1_full=True):
     sessions, _ = get_session(mouse, ('FC','E1_1','E2_1','RE_1'))
 
     s1 = sessions[0]
     s2 = sessions[1:]
 
-    d = []
+    distances = []
+    p_freezings = []
     for i, session in enumerate(s2):
-        d.append(cosine_distance_between_matrices(s1, session,
-                                                  bin_length=bin_length,
-                                                  neurons=neurons,
-                                                  ref_time=ref_time))
+        d, p_freezing = \
+            cosine_distance_between_matrices(s1, session,
+                                             bin_length=bin_length,
+                                             neurons=neurons,
+                                             ref_time=ref_time,
+                                             s1_full=s1_full)
 
-        if i == 0:
-            ylims = plt.gca().get_ylim()
+        distances.append(d)
+        p_freezings.append(p_freezing)
 
-        if i > 0:
-            plt.gca().set_ylim(ylims)
+    plot_cosine_distances(distances, p_freezings)
 
-    return d
+    return distances, p_freezings
 
 def pairwise_correlate_traces(session_index, neurons=None):
     """
@@ -239,7 +275,7 @@ def pairwise_correlate_traces(session_index, neurons=None):
     """
     # Load data and trim.
     traces, t = d_pp.load_and_trim(session_index, neurons=neurons)
-    corr_matrix = np.corrcoef(traces)
+    corr_matrix = pd.DataFrame(traces).corr()
 
     return corr_matrix
 
@@ -298,6 +334,23 @@ if __name__ == '__main__':
     #
     # pass
 
-    do_cosine_distance_analysis('Janus', ref_time=938)
+    mice = ('Kerberos',
+            'Nix',
+            'Titan',
+            'Hyperion',
+            'Calypso',
+            'Pandora',
+            'Janus',
+            'Kepler',
+            'Mundilfari',
+            'Tarvos',
+            'Aegir',
+            )
+
+    for mouse in mice:
+        try:
+            do_cosine_distance_analysis(mouse, bin_length=30)
+        except:
+            do_cosine_distance_analysis(mouse, bin_length=30)
     plt.show()
     pass
