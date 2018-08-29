@@ -7,7 +7,7 @@ Created on Wed Jan 17 14:11:14 2018
 
 from microscoPy_load.cell_data_compiler import CellData
 from plotting.plot_helper import ScrollPlot, neuron_number_title
-from session_directory import load_session_list
+from session_directory import load_session_list, get_session
 from os import path
 from plotting import plot_functions as plot_funcs
 from microscoPy_load import ff_video_fixer as ff
@@ -18,6 +18,8 @@ from helper_functions import ismember
 from scipy.stats import zscore
 import scipy.io as sio
 import data_preprocessing as d_pp
+import matplotlib.pyplot as plt
+from plotting.fov import insert_scale_bar
 
 session_list = load_session_list()
 
@@ -76,6 +78,56 @@ def plot_traces(session_index, neurons):
 
     # Gets the ScrollPlot object.
     return f
+
+
+def plot_multi_traces(mouse, session_stage, neurons=[x for x in range(10)],
+                      step=5):
+    """
+    Plots multiple traces on one subplot.
+
+    Parameters:
+        mouse: str, mouse name.
+        session_stage: str, session name.
+        neurons: list, list of neurons to plot.
+        step: scalar, distance between traces on plot.
+
+    Returns:
+
+    """
+    # Load traces and z-score.
+    session_index = get_session(mouse, session_stage)[0]
+    traces, t = load_traces(session_index)
+    masked = np.ma.masked_invalid(traces)
+    traces = zscore(masked, axis=1)
+
+    # Get information about when mouse was in cage.
+    ff_session = ff.load_session(session_index)
+
+    f, ax = plt.subplots(1,1)
+
+    # Make shift vector.
+    yshift = [x*step for x in neurons]
+
+    # Plot traces with a shift.
+    for shift, trace in zip(yshift, traces[neurons]):
+        ax.plot(t, trace+shift)
+
+    # Fill space where mouse was in cage.
+    ax.fill_between(t, 0, np.max(trace + shift),
+                    ff_session.mouse_in_cage,
+                    alpha=0.4)
+
+    # Insert scale bar for time.
+    insert_scale_bar(ax, pix_to_microns=1, length_in_microns=60, color='k',
+                     linewidth=2)
+    # Insert scale bar for fluorescence magnitude.
+    insert_scale_bar(ax, pix_to_microns=1, length_in_microns=5, color='k',
+                     linewidth=2, horizontal=False)
+
+    ax.axis('off')
+    f.show()
+
+    return f, ax
 
 def plot_freezing_traces(session_index):
     # Load the position data.
@@ -184,4 +236,4 @@ def plot_traces_over_days(session_index, neurons):
 
 
 if __name__ == '__main__':
-    pass
+    plot_multi_traces('Mundilfari','FC')

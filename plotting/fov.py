@@ -82,7 +82,9 @@ def plot_rois(mouse, session_stage, ax=None, color='xkcd:azure',
     return ax
 
 
-def place_scale_bar(ax, pix_to_microns=1.1, length_in_microns=100):
+def insert_scale_bar(ax, pix_to_microns=1.1, length_in_microns=100,
+                     x = 0, y = 0, horizontal=True, linewidth=5,
+                     color='w'):
     """
     Puts a scale bar on an axis.
 
@@ -94,10 +96,14 @@ def place_scale_bar(ax, pix_to_microns=1.1, length_in_microns=100):
     """
     n_pixels = length_in_microns/pix_to_microns
 
-    x = [0, n_pixels]
-    y = [0, 0]
+    if horizontal:
+        x = [x, n_pixels]
+        y = [y, 0]
+    else:
+        x = [x, 0]
+        y = [y, n_pixels]
 
-    ax.plot(x, y, color='w', linewidth=5)
+    ax.plot(x, y, color=color, linewidth=linewidth)
 
 
 def overlay_proj_rois(mouse, session_stage):
@@ -111,9 +117,9 @@ def overlay_proj_rois(mouse, session_stage):
     """
     f, ax, img = plot_fov(mouse, session_stage)
     ax = plot_rois(mouse, session_stage, ax=ax)
-    place_scale_bar(ax)
+    insert_scale_bar(ax)
 
     f.show()
 
 if __name__ == '__main__':
-    overlay_proj_rois('Pandora', 'FC')
+    overlay_proj_rois('Mundilfari', 'FC')

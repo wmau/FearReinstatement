@@ -170,9 +170,16 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     context1_boundaries = session_boundaries[:3]
     context2_boundaries = np.cumsum(max_sizes[3:])
 
+    CA1_E1_1 = CA1[:, E1_1].flatten()
+    CA1_E2_1 = CA1[:, E2_1].flatten()
+    CA1_RE_1 = CA1[:, RE_1].flatten()
+    BLA_E1_1 = BLA[:, E1_1].flatten()
+    BLA_E2_1 = BLA[:, E2_1].flatten()
+    BLA_RE_1 = BLA[:, RE_1].flatten()
+
     # Plot time series of correlation coefficients for CA1.
     f, ax = plt.subplots(2, 2)
-    ax[0, 0].plot(CA1[:, context_1].T)
+    ax[0, 0].plot(CA1[:, context_1].T, linewidth=0.5)
     ax[0, 0].plot(np.nanmean(CA1[:, context_1], axis=0),
                   linewidth=2, color='k')
     for boundary in context1_boundaries:
@@ -182,7 +189,7 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     ax[0, 0].set_title('CA1')
 
     # Plot time series of correlation coefficients for BLA.
-    ax[0, 1].plot(BLA[:, context_1].T)
+    ax[0, 1].plot(BLA[:, context_1].T, linewidth=0.5)
     ax[0, 1].plot(np.nanmean(BLA[:, context_1], axis=0),
                   linewidth=2, color='k')
     for boundary in context1_boundaries:
@@ -192,23 +199,23 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     ax[0, 1].set_title('BLA')
 
     # Boxplot by session type for CA1.
-    data = [CA1[:, E1_1].flatten(),
-            CA1[:, E2_1].flatten(),
-            CA1[:, RE_1].flatten()]
+    data = [CA1_E1_1,
+            CA1_E2_1,
+            CA1_RE_1]
     data = [x[~np.isnan(x)] for x in data]
     scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'],
                 ylabel='Correlation Coefficient', ax=ax[1, 0])
 
     # Boxplot by session type for BLA.
-    data = [BLA[:, E1_1].flatten(),
-            BLA[:, E2_1].flatten(),
-            BLA[:, RE_1].flatten()]
+    data = [BLA_E1_1,
+            BLA_E2_1,
+            BLA_RE_1]
     data = [x[~np.isnan(x)] for x in data]
     scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1, 1])
 
     ###
     f, ax = plt.subplots(2, 2)
-    ax[0, 0].plot(CA1[:, context_2].T)
+    ax[0, 0].plot(CA1[:, context_2].T, linewidth=0.5)
     ax[0, 0].plot(np.nanmean(CA1[:, context_2], axis=0),
                   linewidth=2, color='k')
     for boundary in context2_boundaries:
@@ -219,7 +226,7 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     ax[0, 0].set_title('CA1')
 
     # Plot time series of correlation coefficients for BLA.
-    ax[0, 1].plot(BLA[:, context_2].T)
+    ax[0, 1].plot(BLA[:, context_2].T, linewidth=0.5)
     ax[0, 1].plot(np.nanmean(BLA[:, context_2], axis=0),
                   linewidth=2, color='k')
     for boundary in context2_boundaries:
@@ -227,6 +234,7 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
 
     ax[0, 1].set_xlabel('Time')
     ax[0, 1].set_title('BLA')
+
 
     # Boxplot by session type for CA1.
     data = [CA1[:, E1_2].flatten(),
@@ -243,22 +251,13 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     data = [x[~np.isnan(x)] for x in data]
     scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1, 1])
 
-    CA1_E1_1 = CA1[:, E1_1].flatten()
+
     CA1_E1_1 = CA1_E1_1[~np.isnan(CA1_E1_1)]
-
-    CA1_E2_1 = CA1[:, E2_1].flatten()
     CA1_E2_1 = CA1_E2_1[~np.isnan(CA1_E2_1)]
-
-    CA1_RE_1 = CA1[:, RE_1].flatten()
     CA1_RE_1 = CA1_RE_1[~np.isnan(CA1_RE_1)]
 
-    BLA_E1_1 = BLA[:, E1_1].flatten()
     BLA_E1_1 = BLA_E1_1[~np.isnan(BLA_E1_1)]
-
-    BLA_E2_1 = BLA[:, E2_1].flatten()
     BLA_E2_1 = BLA_E2_1[~np.isnan(BLA_E2_1)]
-
-    BLA_RE_1 = BLA[:, RE_1].flatten()
     BLA_RE_1 = BLA_RE_1[~np.isnan(BLA_RE_1)]
 
     E1_E2_CA1 = mannwhitneyu(CA1_E1_1, CA1_E2_1).pvalue
@@ -268,6 +267,8 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     E1_RE_BLA = mannwhitneyu(BLA_E1_1, BLA_RE_1).pvalue
     E2_RE_BLA = mannwhitneyu(BLA_E2_1, BLA_RE_1).pvalue
 
+    reject_CA1 = fdrcorrection((E1_E2_CA1, E1_RE_CA1, E2_RE_CA1),0.05)[0]
+    reject_BLA = fdrcorrection((E1_E2_BLA, E1_RE_BLA, E2_RE_BLA),0.05)[0]
     plt.show()
     pass
 
@@ -407,4 +408,4 @@ def CrossSessionClassify(bin_length=1, I=100,
 
 
 if __name__ == '__main__':
-    CrossSessionClassify()
+    CrossSessionEventRateCorr()

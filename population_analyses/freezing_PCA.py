@@ -12,7 +12,7 @@ from session_directory import get_session
 session_list = load_session_list()
 
 
-def PCA_session(session_index, bin_length=1, dtype='traces'):
+def PCA_session(session_index, bin_length=5, dtype='traces'):
     session = FF.load_session(session_index)
 
     # Get accepted neurons.
@@ -62,7 +62,8 @@ def PCA_session(session_index, bin_length=1, dtype='traces'):
     fig.show()
 
 def PCA_concatenated_sessions(mouse, bin_length=1, dtype='traces',
-                              global_cell_idx=None, plot_flag=True):
+                              global_cell_idx=None, plot_flag=True,
+                              ax=None):
     sessions, _ = get_session(mouse, ('FC','E1_1','E2_1','RE_1'))
 
     neural_data, days, t, freezing = \
@@ -77,14 +78,19 @@ def PCA_concatenated_sessions(mouse, bin_length=1, dtype='traces',
     X = np.nanmean(np.asarray(neural_data[0:-1]), axis=2)
     X = np.append(X, np.nanmean(neural_data[-1], axis=1)[None, :],
                   axis=0)
+    X.mask = np.ma.nomask
+    good = np.where(~np.isnan(X))[0]
+    X = X[good,:]
 
     # Bin freezing vector.
     binned_freezing = d_pp.bin_time_series(freezing, bins)
     freezing = np.asarray([i.any() for i in binned_freezing])
+    freezing = freezing[good]
 
     binned_days = d_pp.bin_time_series(days, bins)
     day_id, _ = mode(np.asarray(binned_days[0:-1]), axis=1)
     day_id = np.append(day_id, mode(binned_days[-1])[0])
+    day_id = day_id[good]
 
 
     # pca = PCA(n_components=3)
@@ -95,12 +101,16 @@ def PCA_concatenated_sessions(mouse, bin_length=1, dtype='traces',
     # ax = Axes3D(fig)
     #
     #
+
     pca = PCA(n_components=2)
     pca.fit(X)
     Y = pca.transform(X)
 
+
     if plot_flag:
-        fig, ax = plt.subplots()
+        if ax is not None:
+            fig, ax = plt.subplots()
+
         ax.scatter(Y[freezing, 0], Y[freezing, 1],
                    c=day_id[freezing], s=40,
                    marker='P', cmap='summer',alpha=0.2)
@@ -109,7 +119,8 @@ def PCA_concatenated_sessions(mouse, bin_length=1, dtype='traces',
                    marker='.', cmap='summer',alpha=0.2)
 
         freezing_center = np.zeros((len(sessions),2))
-        nonfreezing_center = np.zeros((len(sessions),2))
+        nonfreezing_center = np.zeros_like(freezing_center)
+        center = np.zeros_like(freezing_center)
         unique_days = np.unique(day_id)
         for i, day in enumerate(unique_days):
             points = Y[(day_id == day) & (freezing)]
@@ -118,22 +129,40 @@ def PCA_concatenated_sessions(mouse, bin_length=1, dtype='traces',
             points = Y[(day_id == day) & (~freezing)]
             nonfreezing_center[i] = np.mean(points, axis=0)
 
-        ax.scatter(freezing_center[:,0], freezing_center[:,1],
-                   marker='P', c=unique_days, cmap='summer', s=200,
-                   edgecolors='k', linewidth=2)
-        ax.scatter(nonfreezing_center[:,0], nonfreezing_center[:,0],
-                   marker='.', c=unique_days, cmap='summer', s=200,
-                   edgecolors='k', linewidth=2)
-        plt.xlabel('PC 1')
-        plt.ylabel('PC 2')
-        fig.show()
+            points = Y[(day_id == day)]
+            center[i] = np.mean(points, axis=0)
+
+
+        # ax.scatter(freezing_center[:,0], freezing_center[:,1],
+        #            marker='P', c=unique_days, cmap='summer', s=200,
+        #            edgecolors='k', linewidth=2)
+        # ax.scatter(nonfreezing_center[:,0], nonfreezing_center[:,1],
+        #            marker='.', c=unique_days, cmap='summer', s=200,
+        #            edgecolors='k', linewidth=2)
+        ax.scatter(center[:,0], center[:,1], marker='o', c=unique_days,
+                   cmap='summer', s=100, edgecolors='k', linewidth=2)
+        ax.set_xlabel('PC 1')
+        ax.set_ylabel('PC 2')
+
 
     return Y, freezing
 
 
+if __name__ == '__main__':
+    mice = ('Kerberos',
+            'Nix',
+            'Calypso',
+            'Hyperion',
+            'Pandora',
+            'Janus',
+            'Kepler',
+            'Mundilfari',
+            'Aegir',
+            )
+
+    f, ax = plt.subplots(4,2)
+    ax = ax.ravel()
+    for i, mouse in enumerate(mice):
+        PCA_concatenated_sessions(mouse, ax=ax[i])
 
     pass
-
-
-if __name__ == '__main__':
-    PCA_concatenated_sessions('Janus')

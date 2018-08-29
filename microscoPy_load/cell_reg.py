@@ -162,7 +162,7 @@ def build_cell_rois(mouse, session_stage, save_flag=True):
     contours = []
     for cell in cell_tiffs:
         roi = np.array(Image.open(cell))
-        thresholded_roi = 1*roi > (np.mean(roi) + 20*np.std(roi))
+        thresholded_roi = 1*roi > (np.mean(roi) + 10*np.std(roi))
 
         contours.append(measure.find_contours(thresholded_roi, 0)[0])
 
@@ -174,7 +174,7 @@ def build_cell_rois(mouse, session_stage, save_flag=True):
     return contours
 
 
-def plot_footprints_over_days(mouse, stage_tuple, neurons):
+def plot_footprints_over_days(mouse, session_stage, neurons):
     """
     Plots specified cells across all sessions.
     :param session_index:
@@ -182,7 +182,7 @@ def plot_footprints_over_days(mouse, stage_tuple, neurons):
     :return:
     """
     # Get the mouse name.
-    session_index = get_session(mouse, stage_tuple)[0]
+    session_index = get_session(mouse, session_stage)[0]
 
     # Load the footprints and map.
     footprints = load_cellreg_results(mouse, mode='footprints')
