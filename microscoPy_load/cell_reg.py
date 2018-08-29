@@ -9,6 +9,9 @@ from helper_functions import find_dict_index, ismember
 from microscoPy_load.cell_data_compiler import CellData
 from plotting.plot_helper import ScrollPlot
 from plotting import plot_functions as plot_funcs
+from PIL import Image
+import matplotlib.pyplot as plt
+import skimage.measure as measure
 
 session_list = load_session_list()
 
@@ -150,6 +153,27 @@ def trim_match_map(match_map, session_indices, active_all_days=True):
     return trimmed_map
 
 
+def build_cell_rois(mouse, session_stage, save_flag=True):
+    session_index = get_session(mouse, session_stage)[0]
+    folder = path.join(session_list[session_index]["Location"], 'ROIs')
+
+    cell_tiffs = glob.glob(path.join(folder, '*ROIs_C*.tiff'))
+
+    contours = []
+    for cell in cell_tiffs:
+        roi = np.array(Image.open(cell))
+        thresholded_roi = 1*roi > (np.mean(roi) + 20*np.std(roi))
+
+        contours.append(measure.find_contours(thresholded_roi, 0)[0])
+
+    if save_flag:
+        with open(path.join(session_list[session_index]["Location"],
+                            'ROI_Outlines.pkl'), 'wb') as filename:
+            pickle.dump(contours, filename)
+
+    return contours
+
+
 def plot_footprints_over_days(mouse, stage_tuple, neurons):
     """
     Plots specified cells across all sessions.
@@ -159,7 +183,6 @@ def plot_footprints_over_days(mouse, stage_tuple, neurons):
     """
     # Get the mouse name.
     session_index = get_session(mouse, stage_tuple)[0]
-    mouse = session_list[session_index]["Animal"]
 
     # Load the footprints and map.
     footprints = load_cellreg_results(mouse, mode='footprints')
@@ -305,4 +328,4 @@ class CellRegObj:
 
 
 if __name__ == '__main__':
-    plot_footprints_over_days('Kerberos','FC', [1, 2, 5])
+    build_cell_rois('Pandora','FC')
