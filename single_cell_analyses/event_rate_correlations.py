@@ -83,22 +83,19 @@ def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
                                                    mask=mask,
                                                    neurons=neurons)
 
+
     correlations = np.zeros((len(event_rates)))
     for i, vector in enumerate(event_rates):
         correlations[i] = corr(vector, ref_event_rates)[0]
 
+    if len(binned_in_cage[-1]) < len(binned_in_cage[0])/2:
+        correlations[-1] = np.nan
+
     if plot_flag:
-        plt.plot(correlations[0:-1])
+        plt.plot(correlations)
         plt.show()
 
     return correlations
 
-# if __name__ == '__main__':
-    # import cProfile
-    # cp = cProfile.Profile()
-    # cp.enable()
-    # time_lapse_corr('Mundilfari','E1_1')
-    # cp.disable()
-    # cp.print_stats()
-    #
-    # pass
+if __name__ == '__main__':
+    time_lapse_corr('Calypso','E2_1',slice_size=30)
