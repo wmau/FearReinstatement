@@ -97,13 +97,9 @@ def insert_scale_bar(ax, pix_to_microns=1.1, length_in_microns=100,
     n_pixels = length_in_microns/pix_to_microns
 
     if horizontal:
-        x = [x, n_pixels]
-        y = [y, 0]
+        ax.hlines(y, x, x+n_pixels, colors=color, linewidth=linewidth)
     else:
-        x = [x, 0]
-        y = [y, n_pixels]
-
-    ax.plot(x, y, color=color, linewidth=linewidth)
+        ax.vlines(x, y, y+n_pixels, colors=color, linewidth=linewidth)
 
 
 def overlay_proj_rois(mouse, session_stage):
