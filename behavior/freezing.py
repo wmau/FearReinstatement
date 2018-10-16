@@ -37,13 +37,16 @@ def compute_percent_freezing(session_index, bin_length=60, plot_flag=False):
     return percent_freezing, t_binned
 
 def plot_freezing_percentages(mouse, bin_length=60):
-    session_idx, _ = get_session(mouse, ('FC','E1_1','E2_1','RE_1'))
+    session_stages = ('FC','E1_1','E2_1','RE_1',
+                      'E1_2','E2_2','RE_2')
+    subplot_number = [0, 1, 2, 3, 1, 2, 3]
 
-    f, ax = plt.subplots(1,4,sharey=True)
-    manager = plt.get_current_fig_manager()
-    manager.window.setGeometry(2050,190,1000,270)
+    session_idx, _ = get_session(mouse, session_stages)
+
+    f, ax = plt.subplots(1,4,sharey=True, sharex=True, figsize=(6,2))
     titles = ['Fear conditioning', 'Ext1', 'Ext2', 'Recall']
-    for i, session in enumerate(session_idx):
+
+    for i, session in zip(subplot_number, session_idx):
         p, t = compute_percent_freezing(session,bin_length=bin_length)
 
         ax[i].plot(t, p)
@@ -69,6 +72,6 @@ def plot_freezing(mouse, stages_tuple):
 
 
 if __name__ == '__main__':
-    plot_freezing_percentages('Kerberos')
-
+    plot_freezing_percentages('Helene', bin_length=30)
+    plt.show()
     pass

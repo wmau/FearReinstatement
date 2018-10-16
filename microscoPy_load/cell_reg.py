@@ -182,6 +182,9 @@ def plot_footprints_over_days(mouse, session_stage, neurons):
     :return:
     """
     # Get the mouse name.
+    if isinstance(neurons, int):
+        neurons = [neurons]
+
     session_index = get_session(mouse, session_stage)[0]
 
     # Load the footprints and map.
@@ -328,4 +331,4 @@ class CellRegObj:
 
 
 if __name__ == '__main__':
-    build_cell_rois('Pandora','FC')
+    plot_footprints_over_days('Kerberos','FC',5)

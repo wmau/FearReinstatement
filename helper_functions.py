@@ -10,13 +10,15 @@ def find_closest(array, value):
 
 def ismember(A, B):
     """
-    Returns an array containing logical True where data in A is found in B. Also returns
-    indices in B for every value of A.
+    Returns an array containing logical True where data in B is found
+    in A. Also returns indices in A for every value of B.
     """
 
     B_in_A = np.in1d(B, A)
 
     A = list(A)
+    if isinstance(B, str):
+        B = [B]
     try:
         B_idx = np.zeros(len(B),dtype=int)
         for i,element in enumerate(B):
