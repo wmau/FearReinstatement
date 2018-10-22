@@ -1,9 +1,10 @@
 import matplotlib.pyplot as plt
+plt.rcParams['pdf.fonttype'] = 42
 import numpy as np
 import seaborn as sns
-import statsmodels
 from pandas import MultiIndex
-from scipy.stats import pearsonr, mannwhitneyu
+from scipy.stats import pearsonr, mannwhitneyu, spearmanr, kendalltau, \
+    ttest_ind
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 from statsmodels.stats.multitest import fdrcorrection
@@ -12,16 +13,21 @@ from plotting.plot_functions import scatter_box
 from population_analyses.freezing_classifier import classify_cross_session
 from session_directory import get_session, \
     get_region, load_session_list
-from single_cell_analyses.event_rate_correlations import time_lapse_corr
+from single_cell_analyses.event_rate_correlations \
+    import time_lapse_corr, session_corr
+from single_cell_analyses.freezing_selectivity import speed_modulation
+from microscoPy_load import cell_reg
+from behavior.freezing import compute_percent_freezing
 
 session_list = load_session_list()
 
 # Specify mice and days to be included in analysis.
 mice = ('Kerberos',
         'Nix',
+        'Pandora',
         'Calypso',
         'Hyperion',
-        'Pandora',
+        'Helene',
         'Janus',
         'Kepler',
         'Mundilfari',
@@ -79,20 +85,95 @@ def Fix_Calypso_E2b():
     writer.writerows(lines)
 
 
+def CrossSessionEventRateCorr_wholesession(corr=pearsonr):
+    correlations = np.zeros((n_mice, n_days))
+    for i, mouse in enumerate(mice):
+        for j, session in enumerate(session_2_stages[i]):
+            try:
+                correlations[i,j] = session_corr(mouse, session,
+                                                 corr=corr)
+            except:
+                pass
+
+    return correlations
+
+
+def FindGeneralizers():
+    discriminator = nan((n_mice, 2))
+    for n, mouse in enumerate(mice):
+        session_idx, session_type = \
+            get_session(mouse, ('E1_1','E1_2','RE_1','RE_2'))
+
+        if 'E1_2' in session_type:
+            _, i = ismember(session_type, 'E1_1')
+            shock_freezing = compute_percent_freezing(session_idx[i[0]],
+                                                      bin_length=1)[0]
+            _, i = ismember(session_type, 'E1_2')
+            neutral_freezing = compute_percent_freezing(session_idx[i[0]],
+                                                        bin_length=1)[0]
+
+            p = mannwhitneyu(shock_freezing, neutral_freezing).pvalue
+
+            if p < 0.05:
+                discriminator[n,0] = True
+            else:
+                discriminator[n,0] = False
+
+        if 'RE_2' in session_type:
+            _, i = ismember(session_type, 'RE_1')
+            shock_freezing = compute_percent_freezing(session_idx[i[0]],
+                                                      bin_length=1)[0]
+            _, i = ismember(session_type, 'RE_2')
+            neutral_freezing = compute_percent_freezing(session_idx[i[0]],
+                                                      bin_length=1)[0]
+
+            p = mannwhitneyu(shock_freezing, neutral_freezing).pvalue
+
+            if p < 0.05:
+                discriminator[n,1] = True
+            else:
+                discriminator[n,1] = False
+    pass
+
+
+
 def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
-                              ref_mask_start=None, corr=pearsonr):
+                              ref_mask_start=None, corr=pearsonr,
+                              truncate=True,
+                              omit_speed_modulated=False):
+    slice_size_min = slice_size/60
     # Get correlations and session identities.
     correlations = []
     mouse_id = []
     session_id = []
     for i, mouse in enumerate(mice):
+        if omit_speed_modulated:
+            modulated = speed_modulation(mouse, 'FC')
+            ref_neurons = np.where(~modulated)[0]
+        else:
+            ref_neurons = None
+
+
+        # if active_all_days:
+        #     map = cell_reg.load_cellreg_results(mouse)
+        #     all_sessions = ['FC']
+        #     all_sessions.extend(session_2_stages[i])
+        #     trimmed_map = \
+        #         cell_reg.trim_match_map(map,
+        #                                 get_session(mouse,
+        #                                             all_sessions)[0])
+        #     ref_neurons = trimmed_map[:,0]
+        # else:
+        #     ref_neurons = None
+
         for session in session_2_stages[i]:
             correlations.append(time_lapse_corr(mouse, session,
                                                 bin_size=bin_size,
                                                 slice_size=slice_size,
+                                                ref_neurons=ref_neurons,
                                                 ref_mask_start=ref_mask_start,
                                                 plot_flag=False,
-                                                corr=corr))
+                                                corr=corr)[0])
             mouse_id.append(mouse)
             session_id.append(session)
 
@@ -105,6 +186,8 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
         # nans.
         idx = np.where(ismember(day, session_id)[0])[0]
         max_sizes.append(np.max([len(correlations[i]) for i in idx]))
+
+    session_boundaries = np.cumsum(max_sizes)
 
     # Preallocate a column array. We'll use this to append our session
     # matrices to.
@@ -134,26 +217,10 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
 
     # Delete the first column, which was used to append.
     all_correlations = np.delete(all_correlations, 0, axis=1)
-
-    # Get indices for each session type.
-    session_boundaries = np.cumsum(max_sizes)
-    E1_1 = bool_array(all_correlations.shape[1],
-                      range(session_boundaries[0]))
-    E2_1 = bool_array(all_correlations.shape[1],
-                      range(session_boundaries[0],
-                            session_boundaries[1]))
-    RE_1 = bool_array(all_correlations.shape[1],
-                      range(session_boundaries[1],
-                            session_boundaries[2]))
-    E1_2 = bool_array(all_correlations.shape[1],
-                      range(session_boundaries[2],
-                            session_boundaries[3]))
-    E2_2 = bool_array(all_correlations.shape[1],
-                      range(session_boundaries[3],
-                            session_boundaries[4]))
-    RE_2 = bool_array(all_correlations.shape[1],
-                      range(session_boundaries[4],
-                            session_boundaries[5]))
+    E1_1, E2_1, RE_1, E1_2, E2_2, RE_2 = \
+        make_condition_logicals(all_correlations,
+                                slice_size, session_boundaries,
+                                truncate=truncate)
 
     # Get indices for regions.
     CA1_mice = ismember('CA1', regions)[0]
@@ -167,8 +234,17 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     context_1 = E1_1 | E2_1 | RE_1
     context_2 = E1_2 | E2_2 | RE_2
 
-    context1_boundaries = session_boundaries[:3]
-    context2_boundaries = np.cumsum(max_sizes[3:])
+    if truncate:
+        context1_boundaries = np.array([30/slice_size_min,
+                                        (30/slice_size_min)*2,
+                                        (30/slice_size_min)*2 + 8/slice_size_min])
+        context2_boundaries = context1_boundaries
+        t = np.concatenate((np.arange(0, 30, slice_size_min),
+                            np.arange(0, 30, slice_size_min),
+                            np.arange(0, 8, slice_size_min)))
+    else:
+        context1_boundaries = session_boundaries[:3]
+        context2_boundaries = np.cumsum(max_sizes[3:])
 
     CA1_E1_1 = CA1[:, E1_1].flatten()
     CA1_E2_1 = CA1[:, E2_1].flatten()
@@ -177,25 +253,21 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     BLA_E2_1 = BLA[:, E2_1].flatten()
     BLA_RE_1 = BLA[:, RE_1].flatten()
 
+    CA1_E1_2 = CA1[:, E1_2].flatten()
+    CA1_E2_2 = CA1[:, E2_2].flatten()
+    CA1_RE_2 = CA1[:, RE_2].flatten()
+    BLA_E1_2 = BLA[:, E1_2].flatten()
+    BLA_E2_2 = BLA[:, E2_2].flatten()
+    BLA_RE_2 = BLA[:, RE_2].flatten()
+
     # Plot time series of correlation coefficients for CA1.
-    f, ax = plt.subplots(2, 2)
-    ax[0, 0].plot(CA1[:, context_1].T, linewidth=0.5)
-    ax[0, 0].plot(np.nanmean(CA1[:, context_1], axis=0),
-                  linewidth=2, color='k')
-    for boundary in context1_boundaries:
-        ax[0, 0].axvline(x=boundary)
-    ax[0, 0].set_xlabel('Time')
-    ax[0, 0].set_ylabel('Correlation Coefficient')
+    f, ax = plt.subplots(2, 2, figsize=(9, 7))
+    plot_Rs(ax[0, 0], CA1[:, context_1], context1_boundaries, slice_size_min)
     ax[0, 0].set_title('CA1')
+    ax[0, 0].set_ylabel('Correlation Coefficient')
 
     # Plot time series of correlation coefficients for BLA.
-    ax[0, 1].plot(BLA[:, context_1].T, linewidth=0.5)
-    ax[0, 1].plot(np.nanmean(BLA[:, context_1], axis=0),
-                  linewidth=2, color='k')
-    for boundary in context1_boundaries:
-        ax[0, 1].axvline(x=boundary)
-
-    ax[0, 1].set_xlabel('Time')
+    plot_Rs(ax[0, 1], BLA[:, context_1], context1_boundaries, slice_size_min)
     ax[0, 1].set_title('BLA')
 
     # Boxplot by session type for CA1.
@@ -214,40 +286,27 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1, 1])
 
     ###
-    f, ax = plt.subplots(2, 2)
-    ax[0, 0].plot(CA1[:, context_2].T, linewidth=0.5)
-    ax[0, 0].plot(np.nanmean(CA1[:, context_2], axis=0),
-                  linewidth=2, color='k')
-    for boundary in context2_boundaries:
-        ax[0, 0].axvline(x=boundary)
-
-    ax[0, 0].set_xlabel('Time')
+    f, ax = plt.subplots(2, 2, figsize=(9, 7))
+    plot_Rs(ax[0, 0], CA1[:, context_2], context2_boundaries, slice_size_min)
     ax[0, 0].set_ylabel('Correlation Coefficient')
     ax[0, 0].set_title('CA1')
 
     # Plot time series of correlation coefficients for BLA.
-    ax[0, 1].plot(BLA[:, context_2].T, linewidth=0.5)
-    ax[0, 1].plot(np.nanmean(BLA[:, context_2], axis=0),
-                  linewidth=2, color='k')
-    for boundary in context2_boundaries:
-        ax[0, 1].axvline(x=boundary)
-
-    ax[0, 1].set_xlabel('Time')
+    plot_Rs(ax[0, 1], BLA[:, context_2], context2_boundaries, slice_size_min)
     ax[0, 1].set_title('BLA')
 
-
     # Boxplot by session type for CA1.
-    data = [CA1[:, E1_2].flatten(),
-            CA1[:, E2_2].flatten(),
-            CA1[:, RE_2].flatten()]
+    data = [CA1_E1_2,
+            CA1_E2_2,
+            CA1_RE_2]
     data = [x[~np.isnan(x)] for x in data]
     scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'],
                 ylabel='Correlation Coefficient', ax=ax[1, 0])
 
     # Boxplot by session type for BLA.
-    data = [BLA[:, E1_2].flatten(),
-            BLA[:, E2_2].flatten(),
-            BLA[:, RE_2].flatten()]
+    data = [BLA_E1_2,
+            BLA_E2_2,
+            BLA_RE_2]
     data = [x[~np.isnan(x)] for x in data]
     scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1, 1])
 
@@ -256,21 +315,41 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     CA1_E2_1 = CA1_E2_1[~np.isnan(CA1_E2_1)]
     CA1_RE_1 = CA1_RE_1[~np.isnan(CA1_RE_1)]
 
+    CA1_E1_2 = CA1_E1_2[~np.isnan(CA1_E1_2)]
+    CA1_E2_2 = CA1_E2_2[~np.isnan(CA1_E2_2)]
+    CA1_RE_2 = CA1_RE_2[~np.isnan(CA1_RE_2)]
+
     BLA_E1_1 = BLA_E1_1[~np.isnan(BLA_E1_1)]
     BLA_E2_1 = BLA_E2_1[~np.isnan(BLA_E2_1)]
     BLA_RE_1 = BLA_RE_1[~np.isnan(BLA_RE_1)]
 
+    BLA_E1_2 = BLA_E1_2[~np.isnan(BLA_E1_2)]
+    BLA_E2_2 = BLA_E2_2[~np.isnan(BLA_E2_2)]
+    BLA_RE_2 = BLA_RE_2[~np.isnan(BLA_RE_2)]
+
     E1_E2_CA1 = mannwhitneyu(CA1_E1_1, CA1_E2_1).pvalue
     E1_RE_CA1 = mannwhitneyu(CA1_E1_1, CA1_RE_1).pvalue
     E2_RE_CA1 = mannwhitneyu(CA1_E2_1, CA1_RE_1).pvalue
+
+    E1_E2_CA1_2 = mannwhitneyu(CA1_E1_2, CA1_E2_2).pvalue
+    E1_RE_CA1_2 = mannwhitneyu(CA1_E1_2, CA1_RE_2).pvalue
+    E2_RE_CA1_2 = mannwhitneyu(CA1_E2_2, CA1_RE_2).pvalue
+
     E1_E2_BLA = mannwhitneyu(BLA_E1_1, BLA_E2_1).pvalue
     E1_RE_BLA = mannwhitneyu(BLA_E1_1, BLA_RE_1).pvalue
     E2_RE_BLA = mannwhitneyu(BLA_E2_1, BLA_RE_1).pvalue
 
-    reject_CA1 = fdrcorrection((E1_E2_CA1, E1_RE_CA1, E2_RE_CA1),0.05)[0]
-    reject_BLA = fdrcorrection((E1_E2_BLA, E1_RE_BLA, E2_RE_BLA),0.05)[0]
+    E1_E2_BLA_2 = mannwhitneyu(BLA_E1_2, BLA_E2_2).pvalue
+    E1_RE_BLA_2 = mannwhitneyu(BLA_E1_2, BLA_RE_2).pvalue
+    E2_RE_BLA_2 = mannwhitneyu(BLA_E2_2, BLA_RE_2).pvalue
+
+    reject_CA1 = fdrcorrection((E1_E2_CA1, E1_RE_CA1, E2_RE_CA1,
+                                E1_E2_CA1_2, E1_RE_CA1_2, E2_RE_CA1_2),0.05)[0]
+    reject_BLA = fdrcorrection((E1_E2_BLA, E1_RE_BLA, E2_RE_BLA,
+                                E1_E2_BLA_2, E1_RE_BLA_2, E2_RE_BLA_2),0.05)[0]
     plt.show()
-    pass
+
+    return reject_CA1, reject_BLA
 
 
 def CrossSessionClassify(bin_length=1, I=100,
@@ -406,6 +485,69 @@ def CrossSessionClassify(bin_length=1, I=100,
     plt.show()
     return scores, pvals, permuted
 
+
+def plot_Rs(ax, Rs, boundaries, slice_size_min):
+    #ax.plot(Rs.T, linewidth=0.5, alpha=0.3)
+    #ax.plot(np.nanmean(Rs, axis=0), linewidth=2, color='k')
+    yerr = np.nanstd(Rs, axis=0)/np.sqrt(Rs.shape[0])
+    m = np.nanmean(Rs, axis=0)
+    x = np.r_[0:Rs.shape[1]]
+    ax.errorbar(x, m, yerr=yerr, fmt='ok', ecolor='lightgray',
+                markersize=1, capsize=0)
+    for boundary in boundaries:
+        ax.axvline(x=boundary)
+    ax.set_xticks([0,
+                   30/slice_size_min,
+                   30/slice_size_min+30/slice_size_min,
+                   30/slice_size_min + 30/slice_size_min + 8/slice_size_min])
+    ax.set_xticklabels([0, 30, 30, 8])
+    ax.set_xlabel('Time (min)')
+
+def make_condition_logicals(all_correlations, slice_size, session_boundaries,
+                            truncate=False):
+    # Get indices for each session type.
+    ratio = int(60 / slice_size)
+    array_size = all_correlations.shape[1]
+
+    if truncate:
+        E1_1 = bool_array(array_size,
+                           range(ratio * 30))
+        E2_1 = bool_array(array_size,
+                          range(session_boundaries[0],
+                                ratio*30 + session_boundaries[0]))
+        RE_1 = bool_array(array_size,
+                          range(session_boundaries[1],
+                                ratio*8 + session_boundaries[1]))
+        E1_2 = bool_array(array_size,
+                          range(session_boundaries[2],
+                                ratio * 30 + session_boundaries[2]))
+        E2_2 = bool_array(array_size,
+                          range(session_boundaries[3],
+                                ratio * 30 + session_boundaries[3]))
+        RE_2 = bool_array(array_size,
+                          range(session_boundaries[4],
+                                ratio * 8 +session_boundaries[4]))
+
+    else:
+        E1_1 = bool_array(array_size,
+                          range(session_boundaries[0]))
+        E2_1 = bool_array(array_size,
+                          range(session_boundaries[0],
+                                session_boundaries[1]))
+        RE_1 = bool_array(array_size,
+                          range(session_boundaries[1],
+                                session_boundaries[2]))
+        E1_2 = bool_array(array_size,
+                          range(session_boundaries[2],
+                                session_boundaries[3]))
+        E2_2 = bool_array(array_size,
+                          range(session_boundaries[3],
+                                session_boundaries[4]))
+        RE_2 = bool_array(array_size,
+                          range(session_boundaries[4],
+                                session_boundaries[5]))
+
+    return E1_1, E2_1, RE_1, E1_2, E2_2, RE_2
 
 if __name__ == '__main__':
     CrossSessionEventRateCorr()
