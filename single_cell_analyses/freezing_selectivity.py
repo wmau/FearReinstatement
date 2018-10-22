@@ -2,13 +2,14 @@ from session_directory import load_session_list, get_session
 from microscoPy_load.calcium_events import load_events
 import numpy as np
 import helper_functions as helper
-from scipy.stats import ttest_1samp
+from scipy.stats import ttest_1samp, pearsonr, kendalltau, spearmanr
 from microscoPy_load.calcium_traces import load_traces
 from scipy.stats import zscore
 from plotting.plot_helper import ScrollPlot, neuron_number_title
 from plotting import plot_functions as plot_funcs
 from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff
 import matplotlib.pyplot as plt
+import data_preprocessing as d_pp
 
 session_list = load_session_list()
 
@@ -137,8 +138,35 @@ def plot_prefreezing_traces(mouse, stage_tuple, neurons=None,
 
     return f
 
+def speed_modulation(mouse, stage, neurons=None, dtype='events'):
+    session_index = get_session(mouse, stage)[0]
+    session = ff.load_session(session_index)
+    first_shock = 698*20
+
+    data, t = d_pp.load_and_trim(session_index,
+                                 dtype=dtype,
+                                 neurons=neurons,
+                                 session=session,
+                                 end=first_shock)
+
+    v, _ = d_pp.load_and_trim(session_index,
+                              dtype='velocity',
+                              neurons=None,
+                              session=session,
+                              end=first_shock)
+
+    p = []
+    for neuron in data:
+        p.append(spearmanr(neuron, v)[1])
+
+    p = np.asarray(p)
+
+    modulated = p < 0.01/len(p)
+
+    return modulated
+
+
+
+
 if __name__ == '__main__':
-    #FreezingCellFilter(0, 'trace').get_freezing_cells()
-    plot_prefreezing_traces('Kerberos','E1_1', window=(-5,5), dtype='traces')
-    plt.show()
-    pass
+    speed_modulation('Mundilfari','FC')
