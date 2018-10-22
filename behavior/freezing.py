@@ -4,6 +4,7 @@ import data_preprocessing as d_pp
 from microscoPy_load import calcium_events as ca_events
 import numpy as np
 import matplotlib.pyplot as plt
+from helper_functions import nan
 
 session_list = load_session_list()
 
@@ -54,6 +55,37 @@ def plot_freezing_percentages(mouse, bin_length=60):
 
     ax[0].set_ylabel('% freezing')
 
+    return f, ax
+
+def plot_freezing_percentages2(mouse, bin_length=60):
+    context_1 = ('E1_1', 'E2_1', 'RE_1')
+    context_2 = ('E1_2', 'E2_2', 'RE_2')
+    session_stages = ('FC','E1_1','E2_1','RE_1',
+                           'E1_2','E2_2','RE_2')
+    slice_size_min = bin_length/60
+
+    session_idx, session_stages = get_session(mouse, session_stages)
+
+    freezing_p = {}
+    for session_number, session in zip(session_idx, session_stages):
+        freezing_p[session], t = compute_percent_freezing(session_number,
+                                                          bin_length=bin_length)
+
+
+    context_1_freezing, context_2_freezing = [], []
+    limits = [30/slice_size_min, 30/slice_size_min, 8/slice_size_min]
+    boundaries = np.cumsum(limits)
+    if 'E1_2' in session_stages:
+        for session_1, session_2, limit in \
+                zip(context_1, context_2, limits):
+            context_1_freezing.append(freezing_p[session_1][0:limit])
+            context_2_freezing.append(freezing_p[session_2][0:limit])
+
+
+    pass
+
+
+
 def plot_freezing(mouse, stages_tuple):
     session_index, _ = get_session(mouse, stages_tuple)
     session = load_ff(session_index)
@@ -72,6 +104,6 @@ def plot_freezing(mouse, stages_tuple):
 
 
 if __name__ == '__main__':
-    plot_freezing_percentages('Helene', bin_length=30)
+    plot_freezing_percentages2('Helene', bin_length=30)
     plt.show()
     pass
