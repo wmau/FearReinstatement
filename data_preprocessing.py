@@ -22,26 +22,76 @@ def trim_session(data, indices):
     return data
 
 
-def load_and_trim(session_index, dtype='traces', neurons=None):
-    session = ff.load_session(session_index)
+def load_and_trim(session_index, dtype='traces', neurons=None,
+                  session=None, start=None, end=None):
+    """
+    Load session data and trim it.
 
+    Parameters
+    ---
+    session_index: scalar, session number.
+    dtype: str, possible inputs:
+        'traces'
+        'events'
+        'freezing'
+        'velocity'
+    neurons: list-like, neuron indices.
+    session: FFObj, for performance if calling this function multiple times
+    start: scalar, start index for session timestamp.
+    end: scalar, end index.
+
+    Returns
+    ---
+    data: time series, depending on dtype.
+    t: time vector.
+
+    """
+    # If session is not pre-loaded, load it.
+    if session is None:
+        session = ff.load_session(session_index)
+
+    # Find data type.
     if dtype == 'traces':
         data, t = ca_traces.load_traces(session_index)
         masked = np.ma.masked_invalid(data)
         data = zscore(masked, axis=1)
     elif dtype == 'events':
         data, t = ca_events.load_events(session_index)
+        data = np.ma.masked_invalid(data)
     elif dtype == 'freezing':
         data = session.imaging_freezing
         t = session.imaging_t
+    elif dtype == 'velocity':
+        data = session.imaging_v
+        t = session.imaging_t
     else:
-        raise ValueError('Wrong data type.')
+        raise ValueError('Invalid data type.')
 
+    # Subset of neurons.
     if neurons is not None:
         data = data[neurons]
 
-    data = trim_session(data, session.mouse_in_cage)
-    t = trim_session(t, session.mouse_in_cage)
+    # If start and end indices are not specified, take the mouse in cage
+    # indices.
+    indices = np.zeros_like(session.mouse_in_cage, dtype=bool)
+    if start is None and end is None:
+        indices = session.mouse_in_cage
+    # Else if start is not specified, but end is, take the mouse in cage
+    # start index and specified end index.
+    elif start is None and end is not None:
+        start = np.where(session.mouse_in_cage)[0][0]
+        indices[start:end] = True
+    # Else if end is not specified, but start is, take the specified start
+    # index and mouse in cage end index.
+    elif start is not None and end is None:
+        end = np.where(session.mouse_in_cage)[0][-1]
+        indices[start:end] = True
+    # Else both start and end are specified, use those.
+    else:
+        indices[start:end] = True
+
+    data = trim_session(data, indices)
+    t = trim_session(t, indices)
 
     return data, t
 
@@ -146,6 +196,7 @@ def concatenate_sessions(sessions, include_homecage=False, dtype='traces',
                 data = zscore(masked, axis=1)
             elif dtype == 'events':
                 data, t = ca_events.load_events(session)
+                data = np.ma.masked_invalid(data)
             else:
                 raise ValueError('Invalid data type.')
 
