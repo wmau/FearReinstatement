@@ -5,6 +5,7 @@ from microscoPy_load import calcium_events as ca_events
 import numpy as np
 import matplotlib.pyplot as plt
 from helper_functions import nan
+import itertools
 
 session_list = load_session_list()
 
@@ -37,52 +38,88 @@ def compute_percent_freezing(session_index, bin_length=60, plot_flag=False):
 
     return percent_freezing, t_binned
 
-def plot_freezing_percentages(mouse, bin_length=60):
-    session_stages = ('FC','E1_1','E2_1','RE_1',
-                      'E1_2','E2_2','RE_2')
-    subplot_number = [0, 1, 2, 3, 1, 2, 3]
 
-    session_idx, _ = get_session(mouse, session_stages)
+def plot_freezing_percentages(mouse, bin_length=60, plot=True):
+    """
+    Plot freezing percentages over time and sessions for a mouse. Will
+    automatically truncate EXT sessions to 30 min and Recall sessions to
+    8 min.
 
-    f, ax = plt.subplots(1,4,sharey=True, sharex=True, figsize=(6,2))
-    titles = ['Fear conditioning', 'Ext1', 'Ext2', 'Recall']
+    Parameters
+    ---
+    mouse: str, mouse name.
+    bin_length: scalar, size of bin (in seconds) to compute freezing %.
+    plot: logical, plot or not.
 
-    for i, session in zip(subplot_number, session_idx):
-        p, t = compute_percent_freezing(session,bin_length=bin_length)
+    Returns
+    ---
+    freezing: array, freezing percentages over time.
+    boundaries: array, indices demarcating different sessions.
+    freezing_p: dict, untruncated freezing percentages.
+    """
 
-        ax[i].plot(t, p)
-        ax[i].set_title(titles[i])
-
-    ax[0].set_ylabel('% freezing')
-
-    return f, ax
-
-def plot_freezing_percentages2(mouse, bin_length=60):
+    # Session names.
     context_1 = ('E1_1', 'E2_1', 'RE_1')
     context_2 = ('E1_2', 'E2_2', 'RE_2')
     session_stages = ('FC','E1_1','E2_1','RE_1',
                            'E1_2','E2_2','RE_2')
-    slice_size_min = bin_length/60
 
+    # Bin size in minutes.
+    bin_size_min = bin_length/60
+
+    # Get the sessions.
     session_idx, session_stages = get_session(mouse, session_stages)
+    if 'E1_2' in session_stages:
+        n_contexts = 2
+    else:
+        n_contexts = 1
 
+    # Get freezing percentages in a dict.
     freezing_p = {}
     for session_number, session in zip(session_idx, session_stages):
         freezing_p[session], t = compute_percent_freezing(session_number,
                                                           bin_length=bin_length)
 
-
-    context_1_freezing, context_2_freezing = [], []
-    limits = [30/slice_size_min, 30/slice_size_min, 8/slice_size_min]
+    # Compute the final size of the truncated array in indices.
+    ext_size = 30/bin_size_min
+    rc_size = 8/bin_size_min
+    limits = [0, ext_size, ext_size, rc_size]
     boundaries = np.cumsum(limits)
-    if 'E1_2' in session_stages:
-        for session_1, session_2, limit in \
-                zip(context_1, context_2, limits):
-            context_1_freezing.append(freezing_p[session_1][0:limit])
-            context_2_freezing.append(freezing_p[session_2][0:limit])
 
+    # Preallocate for truncated freezing percentages.
+    freezing = nan((n_contexts, boundaries[-1]))
 
-    pass
+    # For each session, truncate. First row is context 1, second row is
+    # context 2.
+    for session_1, session_2, limit, start, end in \
+            zip(context_1,
+                context_2,
+                limits[1:],
+                boundaries[:-1],
+                boundaries[1:]):
+        freezing[0, start:end] = freezing_p[session_1][0:limit]
+
+        if n_contexts is 2:
+            freezing[1, start:end] = freezing_p[session_2][0:limit]
+
+    # Plot.
+    if plot:
+        f, ax = plt.subplots(1,1)
+        for context in freezing:
+            plt.plot(context)
+
+        for boundary in boundaries:
+            ax.axvline(x=boundary)
+
+        ax.set_xticks([0,
+                       ext_size,
+                       ext_size*2,
+                       ext_size*2 + rc_size])
+        ax.set_xticklabels([0, 30, 30, 8])
+        ax.set_xlabel('Time (min)')
+        ax.set_ylabel('Freezing')
+
+    return freezing, boundaries, freezing_p
 
 
 
@@ -104,6 +141,6 @@ def plot_freezing(mouse, stages_tuple):
 
 
 if __name__ == '__main__':
-    plot_freezing_percentages2('Helene', bin_length=30)
+    plot_freezing_percentages('Helene', bin_length=30)
     plt.show()
     pass

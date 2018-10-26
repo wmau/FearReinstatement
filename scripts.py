@@ -22,7 +22,9 @@ from behavior.freezing import compute_percent_freezing
 session_list = load_session_list()
 
 # Specify mice and days to be included in analysis.
-mice = ('Kerberos',
+mice = (
+        'Telesto',
+        'Kerberos',
         'Nix',
         'Pandora',
         'Calypso',
@@ -34,7 +36,8 @@ mice = ('Kerberos',
         'Aegir',
         )
 
-days = ('E1_1',
+days = (
+        'E1_1',
         'E2_1',
         'RE_1',
         'E1_2',
