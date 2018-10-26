@@ -110,3 +110,22 @@ def bool_array(size, trues):
     arr[trues] = True
 
     return arr
+
+
+def sem(arr, axis=0):
+    """
+    Computes standard error of the mean of the array.
+
+    Parameter
+    ---
+    arr: array, array to be sem'd.
+
+    Return
+    ---
+    standard_error: array, standard error.
+
+    """
+    n = np.sum(~np.isnan(arr), axis=axis)
+    standard_error = np.nanstd(arr, axis=axis)/np.sqrt(n)
+
+    return standard_error
