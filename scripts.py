@@ -8,7 +8,7 @@ from scipy.stats import pearsonr, mannwhitneyu, spearmanr, kendalltau, \
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 from statsmodels.stats.multitest import fdrcorrection
-from helper_functions import ismember, nan, bool_array
+from helper_functions import ismember, nan, bool_array, sem
 from plotting.plot_functions import scatter_box
 from population_analyses.freezing_classifier import classify_cross_session
 from session_directory import get_session, \
@@ -17,7 +17,7 @@ from single_cell_analyses.event_rate_correlations \
     import time_lapse_corr, session_corr
 from single_cell_analyses.freezing_selectivity import speed_modulation
 from microscoPy_load import cell_reg
-from behavior.freezing import compute_percent_freezing
+from behavior.freezing import compute_percent_freezing, plot_freezing_percentages
 
 session_list = load_session_list()
 
@@ -355,6 +355,66 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     return reject_CA1, reject_BLA
 
 
+def Plot_Freezing(bin_length=30):
+    """
+    Plot freezing over the experiment for all mice.
+
+    Parameter
+    ---
+    bin_length: scalar, size of bin (in seconds)
+
+    Return
+    ---
+    Plot of freezing.
+    """
+
+    # Get freezing percentages for each mouse.
+    freezing, freezing_untruncated = {}, {}
+    for mouse in mice:
+        freezing[mouse], freezing_untruncated[mouse], boundaries,\
+            tick_locations = \
+            plot_freezing_percentages(mouse,
+                                      bin_length=bin_length,
+                                      plot=False)
+
+    # Rearrange data into a mouse x time matrix.
+    context1_freezing = nan((n_mice, boundaries[-1]))
+    context2_freezing = nan((n_mice, boundaries[-1]))
+    for i, mouse in enumerate(mice):
+        context1_freezing[i] = freezing[mouse][0]
+
+        try:
+            context2_freezing[i] = freezing[mouse][1]
+        except:
+            pass
+
+    # Compute the mean and sem freezing.
+    c1_freezing_mean = np.nanmean(context1_freezing, axis=0)
+    c1_freezing_sem = sem(context1_freezing)
+    c2_freezing_mean = np.nanmean(context2_freezing, axis=0)
+    c2_freezing_sem = sem(context2_freezing)
+    x = np.r_[0:c1_freezing_mean.shape[0]]
+
+    # Plot.
+    f, ax = plt.subplots(1, 1)
+    ax.errorbar(x, c2_freezing_mean, yerr=c2_freezing_sem, fmt='o',
+                ecolor='navy', markersize=3, capsize=0, mfc='navy',
+                mew=0, alpha=0.5)
+    ax.errorbar(x, c1_freezing_mean, yerr=c1_freezing_sem, fmt='o',
+                ecolor='gray', markersize=3, capsize=0,
+                mfc='gray', mew=0, alpha=0.5)
+
+    for boundary in boundaries:
+        ax.axvline(x=boundary)
+
+    ax.set_xticks(tick_locations)
+    ax.set_xticklabels([0, 8, 30, 30, 8])
+    ax.set_xlabel('Time (min)')
+    ax.set_ylabel('Freezing (%)')
+
+    return f, context1_freezing, context2_freezing
+
+
 def CrossSessionClassify(bin_length=1, I=100,
                          classifier=None,
                          predictor='traces', shuffle='scramble'):
@@ -489,14 +549,14 @@ def CrossSessionClassify(bin_length=1, I=100,
     return scores, pvals, permuted
 
 
-def plot_Rs(ax, Rs, boundaries, slice_size_min):
+def plot_Rs(ax, Rs, boundaries, slice_size_min, color='lightgray'):
     #ax.plot(Rs.T, linewidth=0.5, alpha=0.3)
     #ax.plot(np.nanmean(Rs, axis=0), linewidth=2, color='k')
     yerr = np.nanstd(Rs, axis=0)/np.sqrt(Rs.shape[0])
     m = np.nanmean(Rs, axis=0)
     x = np.r_[0:Rs.shape[1]]
-    ax.errorbar(x, m, yerr=yerr, fmt='ok', ecolor='lightgray',
-                markersize=1, capsize=0)
+    ax.errorbar(x, m, yerr=yerr, fmt='o', ecolor=color,
+                markersize=3, capsize=0, mfc=color, mew=0)
     for boundary in boundaries:
         ax.axvline(x=boundary)
     ax.set_xticks([0,
