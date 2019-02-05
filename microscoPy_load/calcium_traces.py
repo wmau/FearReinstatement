@@ -42,19 +42,35 @@ def load_traces(session_index):
 
     return data.traces.astype(np.float), data.t.astype(np.float)
 
-def save_traces(session_index):
+def save_traces_mat(mouse, stages):
+    """
+    Saves traces as a mat file. Original intent was for running with
+    seqNMF.
+
+    Parameters
+    ---
+    mouse: str, mouse name.
+    stages: str or tuple, session stage.
+
+
+    """
     from microscoPy_load.ff_video_fixer import load_session
 
-    entire_session_traces, _ = load_traces(session_index)
-    session = load_session(session_index)
-    traces = d_pp.trim_session(entire_session_traces,
-                               session.mouse_in_cage)
+    # Load and trim the session.
+    sessions = get_session(mouse, stages)[0]
 
-    directory = session_list[session_index]["Location"]
-    file = path.join(directory, 'Traces.mat')
+    for session_index in sessions:
+        entire_session_traces, _ = load_traces(session_index)
+        session = load_session(session_index)
+        traces = d_pp.trim_session(entire_session_traces,
+                                   session.mouse_in_cage)
 
-    sio.savemat(file,{'traces': traces,
-                      'traces_all': entire_session_traces})
+        # Get directory and save as mat.
+        directory = session_list[session_index]["Location"]
+        file = path.join(directory, 'Traces.mat')
+
+        sio.savemat(file,{'traces': traces,
+                          'traces_all': entire_session_traces})
 
 
 def plot_traces(session_index, neurons):

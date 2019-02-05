@@ -264,8 +264,10 @@ class CellRegObj:
         mouse_directory = find_mouse_directory(self.mouse)
 
         # Get the .mat file name.
-        self.cellreg_results_directory = path.join(mouse_directory, 'CellRegResults')
-        cellreg_file = glob.glob(path.join(self.cellreg_results_directory, 'cellRegistered*.mat'))
+        self.cellreg_results_directory = path.join(mouse_directory,
+                                                   'CellRegResults')
+        cellreg_file = glob.glob(path.join(self.cellreg_results_directory,
+                                           'cellRegistered*.mat'))
         assert len(cellreg_file) is 1, "Multiple cell registration files!"
         cellreg_file = cellreg_file[0]
 

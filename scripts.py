@@ -4,7 +4,7 @@ import numpy as np
 import seaborn as sns
 from pandas import MultiIndex
 from scipy.stats import pearsonr, mannwhitneyu, spearmanr, kendalltau, \
-    ttest_ind
+    ttest_ind, wilcoxon, ks_2samp
 from statsmodels.formula.api import ols
 from statsmodels.stats.anova import anova_lm
 from statsmodels.stats.multitest import fdrcorrection
@@ -23,18 +23,19 @@ session_list = load_session_list()
 
 # Specify mice and days to be included in analysis.
 mice = (
-        'Telesto',
         'Kerberos',
         'Nix',
         'Pandora',
         'Calypso',
-        'Hyperion',
         'Helene',
+        'Hyperion',
         'Janus',
         'Kepler',
         'Mundilfari',
         'Aegir',
-        )
+        'Skoll',
+        'Telesto',
+)
 
 days = (
         'E1_1',
@@ -290,12 +291,12 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
 
     ###
     f, ax = plt.subplots(2, 2, figsize=(9, 7))
-    plot_Rs(ax[0, 0], CA1[:, context_2], context2_boundaries, slice_size_min)
+    plot_Rs(ax[0, 0], CA1[:, context_2], context2_boundaries, slice_size_min, color='navy')
     ax[0, 0].set_ylabel('Correlation Coefficient')
     ax[0, 0].set_title('CA1')
 
     # Plot time series of correlation coefficients for BLA.
-    plot_Rs(ax[0, 1], BLA[:, context_2], context2_boundaries, slice_size_min)
+    plot_Rs(ax[0, 1], BLA[:, context_2], context2_boundaries, slice_size_min, color='navy')
     ax[0, 1].set_title('BLA')
 
     # Boxplot by session type for CA1.
@@ -304,16 +305,16 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
             CA1_RE_2]
     data = [x[~np.isnan(x)] for x in data]
     scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'],
-                ylabel='Correlation Coefficient', ax=ax[1, 0])
+                ylabel='Correlation Coefficient', ax=ax[1, 0], box_color='navy')
 
     # Boxplot by session type for BLA.
     data = [BLA_E1_2,
             BLA_E2_2,
             BLA_RE_2]
     data = [x[~np.isnan(x)] for x in data]
-    scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1, 1])
+    scatter_box(data, xlabels=['Ext1', 'Ext2', 'Recall'], ax=ax[1, 1], box_color='navy')
 
-
+    # Do lots of stats.
     CA1_E1_1 = CA1_E1_1[~np.isnan(CA1_E1_1)]
     CA1_E2_1 = CA1_E2_1[~np.isnan(CA1_E2_1)]
     CA1_RE_1 = CA1_RE_1[~np.isnan(CA1_RE_1)]
@@ -350,6 +351,8 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
                                 E1_E2_CA1_2, E1_RE_CA1_2, E2_RE_CA1_2),0.05)[0]
     reject_BLA = fdrcorrection((E1_E2_BLA, E1_RE_BLA, E2_RE_BLA,
                                 E1_E2_BLA_2, E1_RE_BLA_2, E2_RE_BLA_2),0.05)[0]
+
+
     plt.show()
 
     return reject_CA1, reject_BLA
@@ -411,6 +414,58 @@ def Plot_Freezing(bin_length=30):
     ax.set_xticklabels([0, 8, 30, 30, 8])
     ax.set_xlabel('Time (min)')
     ax.set_ylabel('Freezing (%)')
+
+    # Separate into different sessions.
+    E1_1 = context1_freezing[:, boundaries[1]:boundaries[2]]
+    E2_1 = context1_freezing[:, boundaries[2]:boundaries[3]]
+    RE_1 = context1_freezing[:, boundaries[3]:boundaries[4]]
+
+    E1_2 = context2_freezing[:, boundaries[1]:boundaries[2]]
+    E2_2 = context2_freezing[:, boundaries[2]:boundaries[3]]
+    RE_2 = context2_freezing[:, boundaries[3]:boundaries[4]]
+
+    E1_1_mean = np.nanmean(np.array_split(E1_1,6,axis=1)[0], axis=1)
+    E2_1_mean = np.nanmean(np.array_split(E2_1,6,axis=1)[-1], axis=1)
+    RE_1_mean = np.nanmean(RE_1[:,5:], axis=1)
+
+    E1_2_mean = np.nanmean(np.array_split(E1_2,6,axis=1)[0], axis=1)
+    E2_2_mean = np.nanmean(np.array_split(E2_2,6,axis=1)[-1], axis=1)
+    RE_2_mean = np.nanmean(RE_2[:,5:], axis=1)
+
+    E1_test = wilcoxon(E1_1_mean[~np.isnan(E1_2_mean)],
+                       E1_2_mean[~np.isnan(E1_2_mean)]).pvalue
+    E2_test = wilcoxon(E2_1_mean[~np.isnan(E2_2_mean)],
+                       E2_2_mean[~np.isnan(E2_2_mean)]).pvalue
+    RE_test = wilcoxon(RE_1_mean[~np.isnan(RE_2_mean)],
+                       RE_2_mean[~np.isnan(RE_2_mean)]).pvalue
+
+    E1vsE2 = wilcoxon(E1_1_mean)
+
+    context1_means = [np.nanmean(E1_1_mean),
+                      np.nanmean(E2_1_mean),
+                      np.nanmean(RE_1_mean)]
+    context2_means = [np.nanmean(E1_2_mean),
+                      np.nanmean(E2_2_mean),
+                      np.nanmean(RE_2_mean)]
+
+    context1_sem = [sem(E1_1_mean), sem(E2_1_mean), sem(RE_1_mean)]
+    context2_sem = [sem(E1_2_mean), sem(E2_2_mean), sem(RE_2_mean)]
+
+    ind = np.arange(3)
+    width = 0.35
+
+    fig, ax = plt.subplots()
+    ax.bar(ind, context1_means, width, edgecolor='k' * 3, color='gray',
+           yerr=[(0, 0, 0), context1_sem], capsize=10, linewidth=1)
+    ax.bar(ind + width, context2_means, width, edgecolor='k' * 3,
+           color='navy', yerr=[(0, 0, 0), context2_sem], capsize=10, linewidth=1)
+
+    ax.set_xticks(ind + width / 2)
+    ax.set_xticklabels(('Ext1', 'Ext2', 'Recall'))
+    ax.set_ylabel('Freezing (%)')
+
+    plt.setp(ax.spines.values(), linewidth=1)
+
 
     return f, context1_freezing, context2_freezing
 
@@ -549,14 +604,14 @@ def CrossSessionClassify(bin_length=1, I=100,
     return scores, pvals, permuted
 
 
-def plot_Rs(ax, Rs, boundaries, slice_size_min, color='lightgray'):
+def plot_Rs(ax, Rs, boundaries, slice_size_min, color='lightgray', alpha=1):
     #ax.plot(Rs.T, linewidth=0.5, alpha=0.3)
     #ax.plot(np.nanmean(Rs, axis=0), linewidth=2, color='k')
     yerr = np.nanstd(Rs, axis=0)/np.sqrt(Rs.shape[0])
     m = np.nanmean(Rs, axis=0)
     x = np.r_[0:Rs.shape[1]]
     ax.errorbar(x, m, yerr=yerr, fmt='o', ecolor=color,
-                markersize=3, capsize=0, mfc=color, mew=0)
+                markersize=3, capsize=0, mfc='k', mew=0, alpha=alpha)
     for boundary in boundaries:
         ax.axvline(x=boundary)
     ax.set_xticks([0,
@@ -613,4 +668,4 @@ def make_condition_logicals(all_correlations, slice_size, session_boundaries,
     return E1_1, E2_1, RE_1, E1_2, E2_2, RE_2
 
 if __name__ == '__main__':
-    CrossSessionEventRateCorr()
+    Plot_Freezing()

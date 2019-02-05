@@ -40,13 +40,15 @@ def load_movie(session_index):
 
 
 class FFObj:
-    def __init__(self, session_index, stitch=True):
+    def __init__(self, session_index, stitch=True, pix_to_cm=0.15):
         self.session_index = session_index
         self.csv_location, self.avi_location = self.get_ff_files()
 
         directory, _ = path.split(self.avi_location)
         self.location = path.join(directory, 'Position.pkl')
 
+        self.pix_to_cm = pix_to_cm
+        self.converted = False
         self.movie = skvideo.io.vread(self.avi_location)
         self.n_frames = len(self.movie)
         self.video_t = self.get_timestamps()
@@ -196,6 +198,14 @@ class FFObj:
                            self.position[:, 1])
         self.imaging_v = np.interp(self.imaging_t, self.video_t,
                                    self.velocity)
+
+        # Convert to cm.
+        if not self.converted:
+            self.x = self.x * self.pix_to_cm
+            self.y = self.y * self.pix_to_cm
+            self.imaging_v = self.imaging_v * self.pix_to_cm
+            self.velocity = self.velocity * self.pix_to_cm
+            self.converted = True
 
         self.imaging_freezing = np.zeros(self.imaging_t.shape,
                                          dtype=bool)

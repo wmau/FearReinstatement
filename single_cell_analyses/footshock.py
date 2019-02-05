@@ -1,4 +1,4 @@
-from session_directory import load_session_list
+from session_directory import load_session_list, get_session
 from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff
 import numpy as np
 from helper_functions import find_closest, shift_rows, get_longest_run
@@ -70,7 +70,8 @@ def plot_sequence_over_days(FC_session, test_session):
     pass
 
 class ShockSequence:
-    def __init__(self, session_index, window=[-1, 10]):
+    def __init__(self, mouse, window=[-1, 10]):
+        session_index = get_session(mouse, 'FC')[0]
         self.session_index = session_index
         self.frame_rate = 20
         window.sort()

@@ -14,7 +14,8 @@ import data_preprocessing as d_pp
 session_list = load_session_list()
 
 class FreezingCellFilter:
-    def __init__(self, session_index, dtype='event'):
+    def __init__(self, mouse, session_stage, dtype='trace'):
+        session_index = get_session(mouse, session_stage)[0]
         self.session_index = session_index
         self.dtype = dtype
 
@@ -82,15 +83,52 @@ class FreezingCellFilter:
 
         return significant_cells, p
 
-def plot_prefreezing_traces(mouse, stage_tuple, neurons=None,
-                            dtype='events', window=(-2,2)):
+def plot_prefreezing_traces(mouse, session_stage, neurons=None,
+                            dtype='traces', window=(-2,2),
+                            freeze_duration_threshold=5,
+                            plot_bool=True):
+    """
+    Plots the average activity for each cell centered around the start of
+    freezing bouts. ONLY TESTED WITH DTYPE="TRACES".
+
+    Parameters
+    ---
+    mouse: str, mouse name.
+    session_stage: str, session stage.
+    neurons: list-like: specified neuron indices.
+    dtype: str, data type ('events' or 'traces')
+    window: tuple, (-seconds before freezing, seconds after)
+    freeze_duration_threshold: scalar, freezing duration must be longer
+        than this value (seconds)
+    plot_bool: boolean, whether or not to plot
+
+    Returns
+    ---
+    freeze_traces: dict with the following fields
+        mouse, seession_stage, neurons, window: same as inputs
+        data: untrimmed (includes home cage) traces or events
+        epoch: Fx2 array with first column being the index of the start
+            of the freezing epoch, where F = # of freezing epochs
+        windowed_data: NxFxT matrix depicting the traces centered around
+            the start of a freezing epoch, where N = # neurons and
+            T = window length
+        f: ScrollPlot object
+    """
+
     # Load data and get freezing timestamps.
-    session_index = get_session(mouse, stage_tuple)[0]
+    session_index = get_session(mouse, session_stage)[0]
     session = ff.load_session(session_index)
     freeze_epochs = session.get_freezing_epochs_imaging_framerate()
 
+    # Eliminate freeze epochs that don't pass the duration threshold.
+    good_epochs = np.squeeze(np.diff(freeze_epochs) >
+                             freeze_duration_threshold * 20)
+    freeze_epochs = freeze_epochs[good_epochs, :]
+
+    # Process data depending on data type.
     if dtype == 'traces':
         data, _ = ca_traces.load_traces(session_index)
+        data = np.ma.masked_invalid(data)
         data = zscore(data, axis=1)
     elif dtype == 'events':
         data, _ = ca_events.load_events(session_index)
@@ -98,45 +136,68 @@ def plot_prefreezing_traces(mouse, stage_tuple, neurons=None,
     else:
         raise ValueError("Invalid data type.")
 
+    # Index the list if neurons were specified.
     if neurons is not None:
         data = data[neurons]
         titles = neuron_number_title(neurons)
     else:
         titles = neuron_number_title(range(len(data)))
 
+    # Get sizes for all dimensions of our array.
     n_neurons = len(data)
     n_freezes = freeze_epochs.shape[0]
     freeze_duration = abs(np.ceil(np.diff(window)*20)).astype(int)[0]
 
+    # Plot each cell and each freeze epoch.
     prefreezing_traces = np.zeros((n_neurons, n_freezes, freeze_duration))
     t = np.arange(window[0], window[1], 1/20)
     for n, trace in enumerate(data):
         for i, epoch in enumerate(freeze_epochs):
-            start = epoch[0]-freeze_duration
-            stop = epoch[0]
+            start = epoch[0] - (abs(window[0]) * 20)
+            stop = epoch[0] + (abs(window[1]) * 20)
             prefreezing_traces[n, i, :] = trace[start:stop]
 
+    f = None        # Necessary if plot_flag is False.
     if dtype == 'events':
         events = [[(np.where(bout)[0] - freeze_duration)/20
                    for bout in cell]
                    for cell in prefreezing_traces]
 
-        f = ScrollPlot(plot_funcs.plot_raster, events=events,
-                       window=window,
-                       xlabel='Time from start of freezing (s)',
-                       ylabel='Freezing bout #', titles=titles)
+        if plot_bool:
+            f = ScrollPlot(plot_funcs.plot_raster,
+                           events=events,
+                           window=window,
+                           xlabel='Time from start of freezing (s)',
+                           ylabel='Freezing bout #',
+                           titles=titles)
 
     elif dtype == 'traces':
-        f = ScrollPlot(plot_funcs.plot_multiple_traces,
-                       traces = prefreezing_traces,
-                       t = t,
-                       xlabel = 'Time from start of freezing (s)',
-                       ylabel = 'Freezing bout #', titles=titles)
+        if plot_bool:
+            f = ScrollPlot(plot_funcs.plot_multiple_traces,
+                           traces=prefreezing_traces,
+                           t=t,
+                           xlabel='Time from start of freezing (s)',
+                           ylabel='Fluorescence amplitude (z)',
+                           titles=titles)
 
     else:
         raise ValueError("Invalid data type.")
 
-    return f
+    # Summarize.
+    freeze_traces = {
+        "mouse": mouse,
+        "session_stage": session_stage,
+        "data": data,
+        "neurons": neurons,
+        "window": window,
+        "epochs": freeze_epochs,
+        "windowed_data": prefreezing_traces,
+        "figure": f,
+    }
+
+    return freeze_traces
+
+
 
 def speed_modulation(mouse, stage, neurons=None, dtype='events'):
     session_index = get_session(mouse, stage)[0]
@@ -169,4 +230,5 @@ def speed_modulation(mouse, stage, neurons=None, dtype='events'):
 
 
 if __name__ == '__main__':
-    speed_modulation('Mundilfari','FC')
+    F = plot_prefreezing_traces('Aegir','RE_1')
+    pass

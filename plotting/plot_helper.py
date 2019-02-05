@@ -21,8 +21,12 @@ class ScrollPlot:
     """
 
     # Initialize the class. Gather the data and labels.
-    def __init__(self, plot_func, xlabel = '', ylabel = '',
-                 titles = ([' '] * 10000), **kwargs):
+    def __init__(self,
+                 plot_func,
+                 xlabel = '',
+                 ylabel = '',
+                 titles = ([' '] * 10000),
+                 **kwargs):
         self.plot_func = plot_func
         self.xlabel = xlabel
         self.ylabel = ylabel
@@ -71,7 +75,7 @@ class ScrollPlot:
     def update_plots(self, event):
         # Clear axis.
         try:
-            for ax in self.ax:
+            for ax in self.fig.axes:
                 ax.cla()
         except:
             self.ax.cla()

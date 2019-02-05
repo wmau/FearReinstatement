@@ -1,13 +1,17 @@
 from os import path
-from session_directory import load_session_list
+from session_directory import load_session_list, get_session
 import scipy.io as sio
 import numpy as np
 
 session_list = load_session_list()
 
 class seqNMF:
-    def __init__(self, session_index, var_names=('H','W','XC','thres'),
+    def __init__(self, mouse, session, var_names=('H','W','XC','thres',
+                                                  'is_significant'),
                  mat_file='seqNMF_results.mat'):
+        self.mouse = mouse
+        self.session = session
+        session_index = get_session(mouse, session)[0]
         self.session_index = session_index
         self.mouse = session_list[session_index]["Animal"]
         self.directory = session_list[session_index]["Location"]
@@ -26,9 +30,11 @@ class seqNMF:
     def count_sequences(self):
         try:
             self.n_sequences = np.sum(self.data['H'].any(axis=1))
+            self.n_sig_sequences = np.sum(self.data['is_significant'])
         except:
             data = sio.loadmat(self.filename, variable_names='H')
             self.n_sequences = np.sum(data['H'].any(axis=1))
+            self.n_sig_sequences = np.sum(self.data['is_significant'])
 
     def get_sequential_cells(self):
         try:
@@ -40,12 +46,14 @@ class seqNMF:
         # Get statistically significant cells for each sequence.
         significant_cells = []
         n_time_bins = XC.shape[1]
-        for sequence, thresholds in zip(range(self.n_sequences), thres):
+        for sequence, thresholds in zip(range(self.n_sig_sequences),
+                                        thres):
             # Cross correlation of each cell.
-            if self.n_sequences == 1:
+            if self.n_sig_sequences == 1:
                 xcorr = XC
             else:
                 xcorr = XC[:,:,sequence]
+
             thresholds = np.tile(thresholds,[n_time_bins,1]).T
 
             # Time bins where cross correlation exceeds null.
@@ -76,5 +84,6 @@ class seqNMF:
 
 
 if __name__ == '__main__':
-    S = seqNMF(5)
+    session_index = get_session('Mundilfari','FC')[0]
+    S = seqNMF(session_index,mat_file='seqNMF_results_events.mat')
     S.get_sequential_cells()

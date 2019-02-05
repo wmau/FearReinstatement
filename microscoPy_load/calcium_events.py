@@ -6,7 +6,7 @@ Created on Mon Jan 22 11:09:29 2018
 """
 
 from microscoPy_load.cell_data_compiler import CellData
-from session_directory import load_session_list
+from session_directory import load_session_list, get_session
 from plotting.plot_helper import ScrollPlot, neuron_number_title
 from plotting import plot_functions as plot_funcs
 from microscoPy_load import calcium_traces as ca_traces
@@ -34,19 +34,38 @@ def load_event_times(session_index):
     return data.event_times, data.event_values
 
 
-def save_events(session_index):
+def save_events_mat(mouse, stages):
+    """
+    Saves events as a mat file. Original intent was for running with
+    seqNMF.
+
+    Parameters
+    ---
+    mouse: str, mouse name.
+    stages: str or tuple, session stage.
+
+    """
     from microscoPy_load.ff_video_fixer import load_session
 
-    entire_session_events, _ = load_events(session_index)
-    session = load_session(session_index)
-    events = d_pp.trim_session(entire_session_events,
-                               session.mouse_in_cage)
+    def load_and_save(session_index):
+        entire_session_events, _ = load_events(session_index)
+        session = load_session(session_index)
+        events = d_pp.trim_session(entire_session_events,
+                                   session.mouse_in_cage)
 
-    directory = session_list[session_index]["Location"]
-    file = path.join(directory, 'Events.mat')
+        directory = session_list[session_index]["Location"]
+        file = path.join(directory, 'Events.mat')
 
-    sio.savemat(file,{'events': events,
-                      'events_all': entire_session_events})
+        sio.savemat(file, {'events': events,
+                           'events_all': entire_session_events})
+
+    sessions = get_session(mouse, stages)[0]
+    try:
+        for session_index in sessions:
+            load_and_save(session_index)
+    except:
+        load_and_save(sessions)
+
 
 
 def plot_events(session_index, neurons):

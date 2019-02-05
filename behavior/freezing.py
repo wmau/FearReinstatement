@@ -106,8 +106,7 @@ def plot_freezing_percentages(mouse, bin_length=60, plot=True):
     # Compute the final size of the truncated array in indices.
     cfc_size = int(8/bin_size_min)
     ext_size = int(30/bin_size_min)
-    rc_size = int(8/bin_size_min)
-    limits = [0, cfc_size, ext_size, ext_size, rc_size]
+    limits = [0, cfc_size, ext_size, ext_size, cfc_size]
     boundaries = np.cumsum(limits).astype(int)
 
     # Preallocate for truncated freezing percentages.
@@ -125,20 +124,30 @@ def plot_freezing_percentages(mouse, bin_length=60, plot=True):
                 boundaries[1:-1],
                 boundaries[2:]):
         try:
-            freezing[0, start:end] = freezing_untruncated[session_1][:limit]
+            try:
+                freezing[0, start:end] = \
+                    freezing_untruncated[session_1][:limit]
+            except:
+                end = start + len(freezing_untruncated[session_1])
+                freezing[0, start:end] = \
+                    freezing_untruncated[session_1]
         except:
             pass
 
         if n_contexts is 2:
-            freezing[1, start:end] = freezing_untruncated[session_2][:limit]
-
-    pass
+            try:
+                freezing[1, start:end] = \
+                    freezing_untruncated[session_2][:limit]
+            except:
+                end = start + len(freezing_untruncated[session_2])
+                freezing[1, start:end] = \
+                    freezing_untruncated[session_2]
 
     tick_locations = [0,
                       cfc_size,
                       cfc_size + ext_size,
                       cfc_size + ext_size*2,
-                      cfc_size + ext_size*2 + rc_size]
+                      cfc_size + ext_size*2 + cfc_size]
 
     # Plot.
     if plot:

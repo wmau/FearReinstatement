@@ -4,6 +4,7 @@ List of plotting functions to pass through ScrollPlot
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
+from helper_functions import sem
 
 def plot_traces(obj):
     """
@@ -90,9 +91,18 @@ def plot_multiple_traces(obj):
         c = cm.gray(i/len(obj.traces[obj.current_position]),1)
         obj.ax.plot(obj.t,trace,color=c)
 
-    obj.ax.plot(obj.t,np.mean(obj.traces[obj.current_position],
-                              axis=0),
-                color='r', linewidth=2)
+    if len(obj.fig.axes) < 2:
+        ax2 = obj.ax.twinx()
+    else:
+        ax2 = obj.fig.axes[1]
+
+    y = np.mean(obj.traces[obj.current_position],axis=0)
+    yerr = sem(obj.traces[obj.current_position])
+    ax2.plot(obj.t, y, color='r', linewidth=2)
+    ax2.fill_between(obj.t, y-yerr, y+yerr, alpha=0.2,
+                     edgecolor='none',
+                     facecolor='r')
+    ax2.axvline(x=0, color='k')
 
     obj.last_position = len(obj.traces) - 1
 

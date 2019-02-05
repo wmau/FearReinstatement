@@ -1,5 +1,5 @@
 from sequences.seqNMF_data import seqNMF
-from session_directory import load_session_list
+from session_directory import load_session_list, get_session
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import zscore
@@ -98,10 +98,12 @@ def plot_ordered_cells_across_days(session_1, session_2, cells,
                        dtype=dtype)
 
 
-def plot_sequences(session_index, dtype='event',
+def plot_sequences(mouse, stage, dtype='event',
                    mat_file='seqNMF_results.mat'):
+
     # Load data.
-    seqNMF_results = seqNMF(session_index, mat_file=mat_file)
+    seqNMF_results = seqNMF(mouse, stage, mat_file=mat_file)
+    session_index = get_session(mouse, stage)[0]
 
     # Get significantly contributing cells.
     significant_cells = seqNMF_results.get_sequential_cells()
@@ -166,6 +168,5 @@ def plot_sequences_across_days(session_1, session_2, dtype='event',
 
 
 if __name__ == '__main__':
-    from single_cell_analyses.freezing_selectivity import FreezingCellFilter
-    cells, p = FreezingCellFilter(5, 'trace').get_freezing_cells()
-    plot_ordered_cells(5, cells)
+     plot_sequences('Mundilfari', 'FC',
+                    mat_file='seqNMF_results_eventsL=20.mat')

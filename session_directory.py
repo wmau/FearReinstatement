@@ -159,6 +159,7 @@ def get_session(mouse, stages_tuple):
     Return
     ---
     sessions: indices of session_list.
+    stages: strings of stages.
 
     """
     mouse_sessions, _ = find_mouse_sessions(mouse)
