@@ -5,8 +5,8 @@ import seaborn as sns
 from pandas import MultiIndex
 from scipy.stats import pearsonr, mannwhitneyu, spearmanr, kendalltau, \
     ttest_ind, wilcoxon, ks_2samp
-from statsmodels.formula.api import ols
-from statsmodels.stats.anova import anova_lm
+# from statsmodels.formula.api import ols
+# from statsmodels.stats.anova import anova_lm
 from statsmodels.stats.multitest import fdrcorrection
 from helper_functions import ismember, nan, bool_array, sem
 from plotting.plot_functions import scatter_box
@@ -668,4 +668,4 @@ def make_condition_logicals(all_correlations, slice_size, session_boundaries,
     return E1_1, E2_1, RE_1, E1_2, E2_2, RE_2
 
 if __name__ == '__main__':
-    Plot_Freezing()
+    CrossSessionEventRateCorr()

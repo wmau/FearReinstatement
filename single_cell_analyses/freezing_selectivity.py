@@ -62,6 +62,7 @@ class FreezingCellFilter:
                     freezing_event_rate[cell, epoch_number] = \
                         np.mean(events[epoch[0]:epoch[1]])
 
+
         return freezing_event_rate
 
     def get_freezing_cells(self):
