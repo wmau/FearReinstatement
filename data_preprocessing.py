@@ -23,7 +23,7 @@ def trim_session(data, indices):
 
 
 def load_and_trim(session_index, dtype='traces', neurons=None,
-                  session=None, start=None, end=None):
+                  session=None, start=None, end=None, do_zscore=True):
     """
     Load session data and trim it.
 
@@ -53,11 +53,14 @@ def load_and_trim(session_index, dtype='traces', neurons=None,
     # Find data type.
     if dtype == 'traces':
         data, t = ca_traces.load_traces(session_index)
-        masked = np.ma.masked_invalid(data)
-        data = zscore(masked, axis=1)
+        data = np.ma.masked_invalid(data)
+
+        if do_zscore:
+            data = zscore(data, axis=1)
     elif dtype == 'events':
         data, t = ca_events.load_events(session_index)
         data = np.ma.masked_invalid(data)
+        data[data > 0] = 1
     elif dtype == 'freezing':
         data = session.imaging_freezing
         t = session.imaging_t

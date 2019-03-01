@@ -61,6 +61,8 @@ def PCA_session(session_index, bin_length=5, dtype='traces'):
     s = ax.scatter(Y[:, 0], Y[:, 1], Y[:, 2], c=binned_freezing)
     fig.show()
 
+    return X, Y
+
 def PCA_concatenated_sessions(mouse, bin_length=10, dtype='traces',
                               global_cell_idx=None, plot_flag=True,
                               ax=None):
@@ -151,6 +153,7 @@ def PCA_concatenated_sessions(mouse, bin_length=10, dtype='traces',
 
 
     return Y, freezing
+
 
 
 if __name__ == '__main__':
