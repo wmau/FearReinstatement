@@ -1,5 +1,6 @@
 import numpy as np
 from itertools import groupby
+from scipy.stats import zscore
 
 def find_closest(array, value):
     value = float(value)
@@ -129,3 +130,35 @@ def sem(arr, axis=0):
     standard_error = np.nanstd(arr, axis=axis)/np.sqrt(n)
 
     return standard_error
+
+
+def detect_onsets(bool_arr):
+    """
+    Detect onsets of True values in a boolean array.
+
+    :param bool_arr:
+    :return:
+    """
+    int_arr = bool_arr.astype(int)
+    onsets = np.diff(int_arr, axis=1)
+    onsets[onsets < 0] = 0
+
+    return onsets
+
+
+def partial_z(arr, inds):
+    """
+    Computes z-score on a subset of the data, specified by inds.
+    Currently only works on 2D array along columns.
+
+    :param arr:
+    :param axis:
+    :return:
+    """
+
+    partial_arr = arr[:,inds]
+    z = zscore(partial_arr, axis=1)
+    arr[:,inds] = z
+    arr[:,~inds] = np.nan
+
+    return arr

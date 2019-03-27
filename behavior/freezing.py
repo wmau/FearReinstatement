@@ -35,7 +35,7 @@ def compute_percent_freezing(session_index, bin_length=60, plot=False):
 
     # Get bins.
     samples_per_bin = bin_length * 20
-    bins = d_pp.make_bins(t, samples_per_bin)
+    bins = d_pp.make_bins(t, samples_per_bin, axis=0)
 
     # Elapsed time in minutes.
     t -= t.min()
@@ -201,4 +201,4 @@ def plot_freezing(mouse, stage):
 
 
 if __name__ == '__main__':
-    pass
+    plot_freezing('Skoll','RE_2')

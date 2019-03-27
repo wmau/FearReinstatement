@@ -96,7 +96,7 @@ def plot_multiple_traces(obj):
     else:
         ax2 = obj.fig.axes[1]
 
-    y = np.mean(obj.traces[obj.current_position],axis=0)
+    y = np.nanmean(obj.traces[obj.current_position],axis=0)
     yerr = sem(obj.traces[obj.current_position])
     ax2.plot(obj.t, y, color='r', linewidth=2)
     ax2.fill_between(obj.t, y-yerr, y+yerr, alpha=0.2,

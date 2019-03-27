@@ -9,6 +9,7 @@ import data_preprocessing as d_pp
 import numpy as np
 from scipy.stats import zscore
 from helper_functions import ismember
+from scipy.stats import wilcoxon
 from microscoPy_load.cell_reg import load_cellreg_results, trim_match_map
 
 def single_session_assembly(mouse, stage, neurons=None, dtype='traces',
@@ -134,14 +135,46 @@ def assembly_freezing(mouse, stage, neurons=None, dtype='traces',
     ensemble_active = threshold_ensemble_activity(ensemble_timecourse)
 
     # Plot ensemble timecourse with freezing.
-    for ensemble, active in zip(ensemble_timecourse,
-                                ensemble_active):
+    for ensemble_strengths, ensemble_activations \
+            in zip(ensemble_timecourse, ensemble_active):
+        plot_ensemble_activations_with_freezing(t, ensemble_strengths,
+                                                ensemble_activations, freezing)
+
+
+def plot_ensemble_activations_with_freezing(t, ensemble_strengths,
+                                            ensemble_activations,
+                                            freezing,
+                                            ax=None):
+    """
+    Plots ensemble activation strength timecourse overlaid with
+    freezing bouts.
+
+    Parameters
+    ---
+    t: list-like
+        Time vector.
+
+    ensemble_strengths: (time,) array
+        Matrix of ensemble activation strengths.
+
+    ensemble_activations: (time,) array
+        Boolean matrix of time bins above threshold.
+
+    freezing: list-like
+        Boolean array of freezing status.
+
+    ax: Axes object, default: None
+        Axis to plot on. If not specified, make a new figure.
+    """
+    if ax is None:
         fig, ax = plt.subplots(1)
-        ax.plot(t, ensemble, linewidth=0.2, color='k')
-        ax.fill_between(t, -0.5, ensemble.max()+0.5, freezing,
-                        facecolor='r', alpha=0.4)
-        ax.fill_between(t, -0.5, ensemble.max()+0.5, active,
-                        facecolor='g', alpha=0.4)
+
+    ax.plot(t, ensemble_strengths, linewidth=0.2, color='k')
+    ax.fill_between(t, -0.5, ensemble_strengths.max()+0.5, freezing,
+                    facecolor='r', alpha=0.4)
+    ax.fill_between(t, -0.5, ensemble_strengths.max()+0.5,
+                    ensemble_activations,
+                    facecolor='g', alpha=0.4)
 
 
 def threshold_ensemble_activity(ensemble_timecourse, n=2):
@@ -157,8 +190,8 @@ def threshold_ensemble_activity(ensemble_timecourse, n=2):
         Number of standard deviations above the mean to be considered active.
 
     """
-    activation_thresh = np.mean(ensemble_timecourse, axis=1) + \
-                        n*np.std(ensemble_timecourse, axis=1)
+    activation_thresh = np.nanmean(ensemble_timecourse, axis=1) + \
+                        n*np.nanstd(ensemble_timecourse, axis=1)
     thr = np.matlib.repmat(activation_thresh,
                            ensemble_timecourse.shape[1], 1).T
     ensemble_active = ensemble_timecourse > thr
@@ -171,7 +204,26 @@ def cross_day_ensemble_activity(mouse, template_session, test_sessions,
                                 session=None, trim=True, start=None,
                                 end=None, method='ica', nullhyp='circ',
                                 n_shuffles=1000, percentile=99):
+    """
+    Gets the ensemble activity across days, keeping the neuron weights
+    from a template session and applying it to test sessions.
 
+    Parameters
+    ---
+    mouse: str
+        Mouse name.
+
+    template_session: str
+        Session type (e.g., 'E1_1').
+
+    test_sessions: list
+        List of session types for that mouse.
+
+    Returns
+    ---
+
+
+    """
 
     # Make list of template and test sessions then get session numbers.
     all_sessions = [template_session]
@@ -202,6 +254,7 @@ def cross_day_ensemble_activity(mouse, template_session, test_sessions,
     session_dict = {}
     z_activity_matrices = {}
     t_vectors = {}
+    freezing = {}
     for i, this_session, neuron_order in zip(session_indices,
                                              all_sessions,
                                              trimmed_map.T):
@@ -214,12 +267,15 @@ def cross_day_ensemble_activity(mouse, template_session, test_sessions,
             t -= t.min()
             z_activity_matrices[this_session] = traces[neuron_order]
             t_vectors[this_session] = t
+            freezing[this_session] = load_and_trim(i, dtype='freezing')[0]
 
         else:
             traces, t = load_traces(i)
             traces = zscore(traces, axis=1)
             z_activity_matrices[this_session] = traces[neuron_order]
             t_vectors[this_session] = t
+            freezing[this_session] = \
+                session_dict[this_session].imaging_freezing
 
     # Get assembly structure.
     patterns, significance, ensemble_timecourse = \
@@ -233,8 +289,8 @@ def cross_day_ensemble_activity(mouse, template_session, test_sessions,
                                 compute_activity=False)
 
     # Get ensemble activity on other days.
-    ensemble_strengths = {}
-    ensemble_activations = {}
+    ensemble_strengths = {}     # Ensemble activation strength.
+    ensemble_activations = {}   # Supra-threshold epochs.
     for this_session, activity_matrix in z_activity_matrices.items():
         ensemble_strengths[this_session] = \
             assembly.computeAssemblyActivity(patterns, activity_matrix)
@@ -243,21 +299,138 @@ def cross_day_ensemble_activity(mouse, template_session, test_sessions,
             threshold_ensemble_activity(ensemble_strengths[this_session])
 
     # Plot activations of ensembles for each session.
-    fig, ax = plt.subplots(len(all_sessions), significance.nassemblies,
-                           squeeze=False, sharey=True)
-    for i, this_session in enumerate(all_sessions):
-        ensembles = ensemble_strengths[this_session]
-        t = t_vectors[this_session]
-        for j, ensemble in enumerate(ensembles):
-            ax[i, j].plot(t, ensemble)
-            ax[i, j].fill_between(t, -0.5, ensemble.max() + 0.5,
-                                  ensemble_activations[this_session][j],
-                                  alpha=0.4, facecolor='g')
-            ax[i, j].set_title(this_session)
+    for n_assembly in range(significance.nassemblies):
+        fig, ax = plt.subplots(len(all_sessions), sharey=True)
 
-    return ensemble_strengths, ensemble_activations,
+        for i, this_session in enumerate(all_sessions):
+            # Get ensemble activation strength and time vectors.
+            ensembles = ensemble_strengths[this_session][n_assembly]
+            activity = ensemble_activations[this_session][n_assembly]
+            t = t_vectors[this_session]
+            frozen = freezing[this_session]
+
+            plot_ensemble_activations_with_freezing(t, ensembles,
+                                                    activity, frozen,
+                                                    ax=ax[i])
+
+    # for i, this_session in enumerate(all_sessions):
+    #     # Get ensemble activation strength and time vectors.
+    #     ensembles = ensemble_strengths[this_session]
+    #     t = t_vectors[this_session]
+    #
+    #     for j, ensemble in enumerate(ensembles):
+    #         # Get supra-threshold epochs.
+    #         active = ensemble_activations[this_session][j]
+    #
+    #         ax[i, j].plot(t, ensemble)      # Plot activation strength.
+    #         ax[i, j].scatter(t[active],     # Mark supra-threshold epochs.
+    #                          np.matlib.repmat(np.nanmax(ensemble) + 0.5, 1,
+    #                                           np.nansum(active)),
+    #                          s=1, c='r')
+    #         ax[i, j].set_title(this_session)
+
+    # Normalize number of activations by session duration.
+    norm_activations = {this_session: np.nansum(activations, axis=1)/activations.shape[1]
+                        for this_session, activations
+                        in ensemble_activations.items()}
+
+    return ensemble_strengths, ensemble_activations, patterns,\
+           significance, norm_activations, freezing, session_dict
 
 
+
+
+## IDEAS:
+    # Count rate of time-normalized ensemble activations
+    # (from either FC or Ext1 templates) and correlate to freezing
+    # during Recall. DONE - Corr_Activations_to_Freezing, positive
+    # correlation for BLA mice, not significant for CA1.
+
+    # Do the above for neutral context. DONE - not significant for neutral
+    # context.
+
+    # Count rate of time-normalized ensemble activations (from Recall)
+    # over Ext1 and Ext2. DONE - RecallEnsembleTimecourse, ambiguous results,
+    # probably need to separate ensembles.
+
+    # Compare Ext1 ensemble template activity in shock recall versus
+    # neutral recall. Done, sort of: Corr_Activations_to_Freezing, no
+    # no difference in BLA.
+
+    # Try setting thresholds from the entire mouse, not just within session. x
+
+    # Look at weights for cells that respond to freezing. Use the recall
+    # session. Using the same extinction session to find freezing cells
+    # and assembly weights might be circular.
 
 if __name__ == '__main__':
-    cross_day_ensemble_activity('Mundilfari','E1_1',['E2_1','RE_1'])
+    (strengths,
+     activations,
+     patterns,
+     significance,
+     norm,
+     freezing,
+     session_dict) = \
+        cross_day_ensemble_activity('Mundilfari','FC',
+                                    ['E1_1','E2_1','RE_1'])
+
+    # mice = (
+    #     'Kerberos',
+    #     'Nix',
+    #     'Pandora',
+    #     'Calypso',
+    #     'Helene',
+    #     'Hyperion',
+    #     'Janus',
+    #     'Kepler',
+    #     'Mundilfari',
+    #     'Aegir',
+    #     'Skoll',
+    #     'Telesto',
+    # )
+    #
+    # strengths, activations, patterns, significance, norm, session_dict = [], [], [], [], [], []
+    # for mouse in mice:
+    #     try:
+    #         a, b, c, d, e, f = \
+    #             cross_day_ensemble_activity(mouse,'FC', ['E1_1', 'E2_1','RE_1'],
+    #                                         n_shuffles=500)
+    #     except:
+    #         a, b, c, d, e, f = np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+    #
+    #     strengths.append(a)
+    #     activations.append(b)
+    #     patterns.append(c)
+    #     significance.append(d)
+    #     norm.append(e)
+    #     session_dict.append(f)
+    #
+    #     print(mouse + ' done')
+    #
+    # BLA = mice[6:]
+    # FC, E1_1, E2_1, RE_1 = [], [], [], []
+    # for mouse, n in zip(mice[:6], norm[:6]):
+    #     try:
+    #         for fc, e1, e2, re in zip(n['FC'],
+    #                                   n['E1_1'],
+    #                                   n['E2_1'],
+    #                                   n['RE_1']):
+    #             FC.append(fc)
+    #             E1_1.append(e1)
+    #             E2_1.append(e2)
+    #             RE_1.append(re)
+    #
+    #     except:
+    #         FC.append(np.nan)
+    #         E1_1.append(np.nan)
+    #         E2_1.append(np.nan)
+    #         RE_1.append(np.nan)
+    #
+    # X = np.stack((np.asarray(FC),
+    #               np.asarray(E1_1),
+    #               np.asarray(E2_1),
+    #               np.asarray(RE_1)),
+    #              axis=1)
+    # plt.plot(X.T)
+    #
+    # stat, p = wilcoxon(X[:,1], X[:,2])

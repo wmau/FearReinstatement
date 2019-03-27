@@ -8,7 +8,7 @@ from scipy.stats import pearsonr, mannwhitneyu, spearmanr, kendalltau, \
 # from statsmodels.formula.api import ols
 # from statsmodels.stats.anova import anova_lm
 from statsmodels.stats.multitest import fdrcorrection
-from helper_functions import ismember, nan, bool_array, sem
+from helper_functions import ismember, nan, bool_array, sem, detect_onsets
 from plotting.plot_functions import scatter_box
 from population_analyses.freezing_classifier import classify_cross_session
 from session_directory import get_session, \
@@ -18,6 +18,10 @@ from single_cell_analyses.event_rate_correlations \
 from single_cell_analyses.freezing_selectivity import speed_modulation
 from microscoPy_load import cell_reg
 from behavior.freezing import compute_percent_freezing, plot_freezing_percentages
+from population_analyses.assembly_analysis import cross_day_ensemble_activity
+from data_preprocessing import convolve
+import data_preprocessing as d_pp
+from itertools import zip_longest
 
 session_list = load_session_list()
 
@@ -36,6 +40,21 @@ mice = (
         'Skoll',
         'Telesto',
 )
+CA1_mice = ('Kerberos',
+           'Nix',
+           'Pandora',
+           'Calypso',
+           'Helene',
+           'Hyperion',
+           )
+
+BLA_mice = ('Kepler',
+            'Janus',
+            'Mundilfari',
+            'Aegir',
+            'Skoll',
+            'Telesto',
+            )
 
 days = (
         'E1_1',
@@ -87,6 +106,41 @@ def Fix_Calypso_E2b():
 
     writer = csv.writer(open(new_name, 'w', newline=''))
     writer.writerows(lines)
+
+
+def FixKeplerShockTraces():
+    import microscoPy_load.calcium_traces as ca_traces
+    from microscoPy_load.cell_data_compiler import CellData
+    import os
+    from pickle import dump
+
+    session_index = get_session('Kepler','FC')[0]
+    path = session_list[session_index]['Location']
+
+    # Load traces.
+    data, t = ca_traces.load_traces(session_index)
+
+    # Fix bad indices based on raw fluorescence.
+    bad_idx = np.logical_or(data > 2500, data < -500)
+    data[bad_idx] = np.nan
+
+    # Get DF/DT.
+    dfdt = np.hstack([np.zeros((data.shape[0], 1)),
+                      np.diff(data, axis=1)])
+
+    # Fix bad values based on df/dt.
+    bad_idx = np.logical_or(dfdt > 200, dfdt < -150)
+    data[bad_idx] = np.nan
+
+    # Convolve based on rolling average.
+    for i, cell in enumerate(data):
+        data[i] = convolve(cell, 20)
+
+    C = CellData(session_index)
+    C.traces = data
+
+    with open(os.path.join(path, 'CellData_new.pkl'), 'wb') as file:
+        dump(C, file)
 
 
 def CrossSessionEventRateCorr_wholesession(corr=pearsonr):
@@ -667,5 +721,152 @@ def make_condition_logicals(all_correlations, slice_size, session_boundaries,
 
     return E1_1, E2_1, RE_1, E1_2, E2_2, RE_2
 
+
+def Corr_Activations_to_Freezing(region=CA1_mice, template_session='E1_1'):
+    """
+    Correlate the number of ensemble activations (averaged across ensembles)
+    during Recall with the amount of freezing in that session.
+
+    Parameters
+    ---
+    region: tuple of strs, default: BLA mice
+        Tuple of mouse names.
+
+    template_session: str, default: 'FC'
+        Session to build ensemble patterns from.
+
+    """
+    shock_activations = []
+    shock_freezing = []
+    neutral_activations = []
+    neutral_freezing = []
+    for mouse in region:
+        try:
+            (activation_strengths,
+             activations,
+             patterns,
+             significance,
+             norm_activations,
+             freezing,
+             session_dict,
+             ) = cross_day_ensemble_activity(mouse, template_session, ['RE_1'])
+
+            shock_activations.append(np.mean(norm_activations['RE_1']))
+            shock_freezing.append(np.sum(freezing['RE_1']
+                                       /len(freezing['RE_1'])))
+
+        except:
+            shock_activations.append(np.nan)
+            shock_freezing.append(np.nan)
+
+        try:
+            (activation_strengths,
+             activations,
+             patterns,
+             significance,
+             norm_activations,
+             freezing,
+             session_dict,
+             ) = cross_day_ensemble_activity(mouse, template_session, ['RE_2'])
+
+            neutral_activations.append(np.mean(norm_activations['RE_2']))
+            neutral_freezing.append(np.sum(freezing['RE_2']
+                                       / len(freezing['RE_2'])))
+
+        except:
+            neutral_activations.append(np.nan)
+            neutral_freezing.append(np.nan)
+
+    fig, ax = plt.subplots()
+    ax.scatter(shock_freezing, shock_activations, color='xkcd:grey')
+    ax.scatter(neutral_freezing, neutral_activations, color='b')
+    ax.set_xlabel('Freezing')
+    ax.set_ylabel('Norm. ensemble activation')
+    p = pearsonr(shock_freezing, shock_activations)
+
+
+def RecallEnsembleTimecourse(region=CA1_mice, test_sessions = ('E1_1', 'E2_1'),
+                             samples_per_bin=2400):
+    """
+    Track the number of ensemble activations from recall over extinction.
+
+    Parameters
+    ---
+    region: str, default: 'BLA_mice'
+        'BLA_mice' or 'CA1_mice'
+
+    test_sessions: list-like, default: ('E1_1', 'E2_1')
+        Sessions over which to track.
+
+    """
+    # Initialize some lists and dicts.
+    all_sessions = [*test_sessions, 'RE_1']
+    n_sessions = len(all_sessions)
+    all_activations = []
+    all_freezing = []
+    all_summed = {}
+    min_per_bin = samples_per_bin/60/20
+
+    # Get template ensembles and activations from each mouse.
+    for mouse in region:
+        try:
+            (activation_strengths,
+             activations,
+             patterns,
+             significance,
+             norm_activations,
+             freezing,
+             session_dict,
+             ) = cross_day_ensemble_activity(mouse, 'RE_1',
+                                             test_sessions,
+                                             n_shuffles=500)
+
+            all_activations.append(activations)
+            all_freezing.append(freezing)
+
+        # NaN if missing a session.
+        except:
+            all_activations.append(np.nan)
+            all_freezing.append(np.nan)
+
+    # Plot.
+    scatter_fig, scatter_ax = plt.subplots(1, n_sessions, sharex=True)
+    line_fig, line_ax = plt.subplots(1, n_sessions, sharex=True, sharey=True)
+    for i, session in enumerate(all_sessions):
+        all_summed[session] = []
+
+        for activations in all_activations:
+            try:
+                onsets = detect_onsets(activations[session])
+
+                # Bin and sum time bins where ensemble was activated.
+                bins = d_pp.make_bins(onsets, samples_per_bin)
+                binned_activations = d_pp.bin_time_series(onsets, bins)
+                summed = [np.sum(b) for b in binned_activations]
+                # Append this to the mega-dict.
+                all_summed[session].append(summed)
+                # Scatter plot.
+                scatter_ax[i].scatter([np.int32(0), *bins], summed, s=5)
+            except:
+                pass
+
+        # Combine the nested lists.
+        all_summed[session] = np.vstack(zip_longest(*all_summed[session], fillvalue=np.nan)).T
+
+        # Make plot values.
+        m = np.nanmean(all_summed[session], axis=0)
+        t = np.arange(0, len(m) * min_per_bin, min_per_bin)
+        std_err = sem(all_summed[session], axis=0)
+
+        # Plot the line.
+        line_ax[i].errorbar(t, m, ecolor='gray', yerr=std_err,
+                            capsize=0, markersize=3, mfc='gray',
+                            mew=0, fmt='o')
+        line_ax[i].set_title(session)
+
+    pass
+
+
+
 if __name__ == '__main__':
-    CrossSessionEventRateCorr()
+    Corr_Activations_to_Freezing()

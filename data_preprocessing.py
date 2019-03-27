@@ -3,10 +3,18 @@ from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_tr
 from scipy.stats import zscore
 from session_directory import load_session_list, get_session
 from helper_functions import find_closest
+import matplotlib.pyplot as plt
+from sklearn.impute import SimpleImputer
 
 session_list = load_session_list()
 
 def filter_good_neurons(accepted):
+    """
+    Pares down the cell list to only include accepted neurons.
+
+    :param accepted:
+    :return:
+    """
     neurons = [cell_number for cell_number, good in
                enumerate(accepted) if good]
 
@@ -57,6 +65,7 @@ def load_and_trim(session_index, dtype='traces', neurons=None,
 
         if do_zscore:
             data = zscore(data, axis=1)
+
     elif dtype == 'events':
         data, t = ca_events.load_events(session_index)
         data = np.ma.masked_invalid(data)
@@ -98,8 +107,8 @@ def load_and_trim(session_index, dtype='traces', neurons=None,
 
     return data, t
 
-def make_bins(data, samples_per_bin):
-    length = len(data)
+def make_bins(data, samples_per_bin, axis=1):
+    length = data.shape[axis]
 
     bins = np.arange(samples_per_bin, length, samples_per_bin)
 
@@ -266,5 +275,26 @@ def get_avg_event_rate(mouse, stage, bin_size=1, data=None,
 
     return avg_event_rates
 
+
+def interp(A):
+    ok = ~np.isnan(A)
+    xp = ok.ravel().nonzero()[0]
+    fp = A[ok]
+    x = np.isnan(A).ravel().nonzero()[0]
+
+    A[np.isnan(A)] = np.interp(x, xp, fp)
+
+    return A
+
+def convolve(A, win_size):
+    mask = np.isnan(A)
+    K = np.ones(win_size, dtype=int)
+    A = np.convolve(np.where(mask, 0, A), K, mode='same') \
+        / np.convolve(~mask, K, mode='same')
+
+    return A
+
 if __name__ == '__main__':
-    get_avg_event_rate('Kerberos','FC')
+    for session_index in range(50):
+        #session_index = get_session('Kepler','FC')[0]
+        load_and_trim(session_index)

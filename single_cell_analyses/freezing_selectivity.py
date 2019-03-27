@@ -46,6 +46,8 @@ class FreezingCellFilter:
         elif self.dtype == 'trace':
             non_freezing_event_rate = \
                 np.mean(self.events[:, self.non_freezing_idx], axis=1)
+        else:
+            raise ValueError('dtype not recognized.')
 
         return non_freezing_event_rate
 
@@ -66,6 +68,12 @@ class FreezingCellFilter:
         return freezing_event_rate
 
     def get_freezing_cells(self):
+        """
+        Gets cells responsive to freezing by comparing activity during
+        freezing to activity during non-freezing.
+
+        :return:
+        """
         non_freezing_event_rate = self.get_non_freezing_event_rate()
         freezing_event_rate = self.get_freezing_event_rate()
 
@@ -77,16 +85,102 @@ class FreezingCellFilter:
             if np.max(freeze) > 0:
                 p[cell] = ttest_1samp(freeze, non_freeze)[1]
 
+        # Gets cells that have higher fluorescence during freezing.
         more_active_during_freezing = np.mean(freezing_event_rate, axis=1) > \
                                       non_freezing_event_rate
+
+        # Gets significant cells.
         significant_cells = np.where((p < (0.05 / self.n_neurons)) &
                                      more_active_during_freezing)[0]
 
         return significant_cells, p
 
+
+class FreezingCellFilter2:
+    """
+    Freezing cell filter.
+
+    """
+    def __init__(self, mouse, session_stage, dtype='traces', window=(-2,2),
+                 freeze_duration_thresh = 1.25):
+        # Metadata.
+        self.mouse = mouse
+        self.session_stage = session_stage
+        self.dtype = dtype
+        self.window = window
+        self.session_index = get_session(mouse, session_stage)[0]
+        self.session = ff.load_session(self.session_index)
+
+        # Imaging data.
+        if self.dtype == 'traces':
+            self.act_matrix = load_traces(self.session_index)[0]
+            self.act_matrix = np.ma.masked_invalid(self.act_matrix)
+            in_chamber = self.session.mouse_in_cage
+            self.act_matrix = helper.partial_z(self.act_matrix,
+                                               in_chamber)
+
+        # Freezing epochs.
+        self.freeze_epochs = self.session.get_freezing_epochs_imaging_framerate()
+        good_epochs = np.squeeze(np.diff(self.freeze_epochs) >
+                                 freeze_duration_thresh * 20)
+        self.freeze_epochs = self.freeze_epochs[good_epochs]
+
+        # Useful variables.
+        self.n_neurons = self.act_matrix.shape[0]
+        self.n_freezes = self.freeze_epochs.shape[0]
+        self.freeze_duration = abs(np.ceil(np.diff(window)*20)).astype(int)[0]
+
+        # Compile the traces centered around the start of a freezing bout.
+        self.compile_freezing_traces()
+
+        pass
+
+    def compile_freezing_traces(self):
+        """
+        Gathers all the traces centered around the start of a freezing bout.
+
+        :return:
+        """
+        self.freezing_traces = np.zeros((self.n_neurons,
+                                         self.n_freezes,
+                                         self.freeze_duration))
+
+        for n, trace in enumerate(self.act_matrix):
+            for i, epoch in enumerate(self.freeze_epochs):
+                start = epoch[0] - (abs(self.window[0]) * 20)
+                stop =  epoch[0] + (abs(self.window[1]) * 20)
+
+                self.freezing_traces[n, i, :] = trace[start:stop]
+
+
+    def plot_traces(self, neurons=None):
+        """
+        Plots traces centered around the start of a freezing bout.
+
+        :param neurons:
+        :return:
+        """
+        if neurons is None:
+            neurons = range(self.n_neurons)
+
+        # Make time vector and titles.
+        t = np.arange(self.window[0], self.window[1], 1/20)
+        titles = neuron_number_title(neurons)
+
+        f = ScrollPlot(plot_funcs.plot_multiple_traces,
+                       traces=self.freezing_traces[neurons],
+                       t=t, xlabel='Time from start of freezing (s)',
+                       ylabel='Fluorescence amplitude (z)',
+                       titles=titles)
+
+
+    #def get_freezing_cells(self):
+
+
+
 def plot_prefreezing_traces(mouse, session_stage, neurons=None,
                             dtype='traces', window=(-2,2),
-                            freeze_duration_threshold=5,
+                            freeze_duration_threshold=1.25,
                             plot_bool=True):
     """
     Plots the average activity for each cell centered around the start of
@@ -231,5 +325,4 @@ def speed_modulation(mouse, stage, neurons=None, dtype='events'):
 
 
 if __name__ == '__main__':
-    F = plot_prefreezing_traces('Aegir','RE_1')
-    pass
+    FreezingCellFilter2('Mundilfari','E1_1')
