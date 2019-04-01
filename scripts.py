@@ -4,11 +4,13 @@ import numpy as np
 import seaborn as sns
 from pandas import MultiIndex
 from scipy.stats import pearsonr, mannwhitneyu, spearmanr, kendalltau, \
-    ttest_ind, wilcoxon, ks_2samp
+    ttest_ind, wilcoxon, ks_2samp, linregress
+from sklearn.linear_model import LinearRegression
 # from statsmodels.formula.api import ols
 # from statsmodels.stats.anova import anova_lm
 from statsmodels.stats.multitest import fdrcorrection
-from helper_functions import ismember, nan, bool_array, sem, detect_onsets
+from helper_functions import ismember, nan, bool_array, sem, detect_onsets, \
+    pad_and_stack
 from plotting.plot_functions import scatter_box
 from population_analyses.freezing_classifier import classify_cross_session
 from session_directory import get_session, \
@@ -22,6 +24,8 @@ from population_analyses.assembly_analysis import cross_day_ensemble_activity
 from data_preprocessing import convolve
 import data_preprocessing as d_pp
 from itertools import zip_longest
+from pickle import dump, load
+import os
 
 session_list = load_session_list()
 
@@ -48,8 +52,8 @@ CA1_mice = ('Kerberos',
            'Hyperion',
            )
 
-BLA_mice = ('Kepler',
-            'Janus',
+BLA_mice = ('Janus',
+            'Kepler',
             'Mundilfari',
             'Aegir',
             'Skoll',
@@ -79,6 +83,7 @@ session_2 = [get_session(mouse, days)[0]
 session_2_stages = [get_session(mouse, days)[1]
                     for mouse in mice]
 
+master_dir = 'U:\\Fear conditioning project_Mosaic2\\SessionDirectories'
 
 def Fix_Calypso_E2b():
     import os
@@ -194,11 +199,204 @@ def FindGeneralizers():
     pass
 
 
+def CrossSessionEventRateCorr2(bin_size=1, slice_size=30,
+                               ref_mask_start=None,
+                               corr=pearsonr, truncate=True,
+                               omit_speed_modulated=True):
+    slice_size_min = slice_size/60
+
+    # Get all the correlation time series.
+    correlations = {}
+    for mouse in mice:
+        # Omit speed modulated neurons, if specified.
+        if omit_speed_modulated:
+            modulated = speed_modulation(mouse, 'FC')
+            ref_neurons = np.where(~modulated)[0]
+        else:
+            ref_neurons = None
+
+        # Preallocate a dict per mouse.
+        correlations[mouse] = {}
+        for session in days:
+            try:
+                correlations[mouse][session] = \
+                    time_lapse_corr(mouse, session,
+                                    ref_session='FC', bin_size=bin_size,
+                                    slice_size=slice_size,
+                                    ref_neurons=ref_neurons,
+                                    ref_mask_start=ref_mask_start,
+                                    plot_flag=False,
+                                    corr=corr)[0]
+
+
+            except:
+                correlations[mouse][session] = nan((0))
+
+
+    # The mice are in the chambers for different lengths of time, even
+    # for the same session type (+/- 1 min). Find the largest session
+    # and use that size to build the matrix. Pad everything else with
+    # nans.
+    longest_sessions = {}
+    for session2s in days:
+        longest_sessions[session2s] = np.max([len(correlations[mouse][session2s])
+                                              for mouse in mice])
+
+    # Get session boundaries in accumulated array.
+    session_boundaries = {}
+    session_boundaries['shock'] = np.cumsum([longest_sessions[session]
+                                             for session in ('E1_1','E2_1','RE_1')])
+    session_boundaries['neutral'] = np.cumsum([longest_sessions[session]
+                                               for session in ('E1_2','E2_2','RE_2')])
+
+    # Arrange correlations nicely into a (mouse, time) array.
+    big_dict = {}
+    big_dict['shock'] = nan((n_mice, session_boundaries['shock'][-1]))
+    big_dict['neutral'] = nan((n_mice, session_boundaries['neutral'][-1]))
+
+    shock_context = ['E1_1', 'E2_1', 'RE_1']
+    neutral_context = ['E1_2', 'E2_2', 'RE_2']
+    # Pad and append.
+    for i, mouse in enumerate(mice):
+        length_difference = [longest_sessions[session] - len(correlations[mouse][session])
+                             for session in shock_context]
+
+        big_dict['shock'][i] = pad_and_stack([correlations[mouse][session]
+                                              for session in shock_context],
+                                             length_difference)
+
+        length_difference = [longest_sessions[session] - len(correlations[mouse][session])
+                             for session in neutral_context]
+
+        big_dict['neutral'][i] = pad_and_stack([correlations[mouse][session]
+                                                for session in neutral_context],
+                                               length_difference)
+
+    big_dict['boundaries'] = session_boundaries
+    with open(os.path.join(master_dir, 'PV_Corrs.pkl'), 'wb') as file:
+        dump(big_dict, file)
+
+    return big_dict
+
+
+def RegressCorrTimeSeries():
+    try:
+        with open(os.path.join(master_dir, 'PV_Corrs.pkl'), 'rb') as file:
+            big_dict = load(file)
+    except:
+        big_dict = CrossSessionEventRateCorr2()
+    session_boundaries = big_dict['boundaries']
+
+    # Regress extinction time bins, then regress recall time bins.
+    # Predict with extinction model, compare to y-intercept of recall model.
+    regressions = {}
+    values = {'shock':      nan((n_mice, 2)),
+              'neutral':    nan((n_mice, 2))}
+    ext_boundary = {}
+    ext_boundary['shock'] = session_boundaries['shock'][1]
+    ext_boundary['neutral'] = session_boundaries['neutral'][1]
+    for i, mouse in enumerate(mice):
+        regressions[mouse] = {}
+
+        # For both contexts..
+        for context in ['shock','neutral']:
+            regressions[mouse][context] = {}
+
+            try:
+                y = big_dict[context][i, :ext_boundary[context]]
+                X = np.arange(ext_boundary[context])
+                X = X[np.isfinite(y)]
+                y = y[np.isfinite(y)]
+
+                # Do regression on extinction.
+                regressions[mouse][context]['ext'] = LinearRegression().fit(X.reshape(-1,1),
+                                                                            y.reshape(-1,1))
+                regressions[mouse][context]['ext'].pval = linregress(X, y)[3]
+
+                y = big_dict[context][i, ext_boundary[context]:]
+                X = np.arange(session_boundaries[context][-1] - ext_boundary[context])
+                X = X[np.isfinite(y)].reshape(-1,1)
+                y = y[np.isfinite(y)].reshape(-1,1)
+
+                # Do regression on recall.
+                regressions[mouse][context]['recall'] = LinearRegression().fit(X,y)
+            except:
+                regressions[mouse][context]['ext'] = np.nan
+                regressions[mouse][context]['recall'] = np.nan
+
+
+            try:
+                values[context][i,0] = regressions[mouse][context]['ext'].predict(np.array(
+                    [ext_boundary[context]+1]).reshape(-1,1))
+                values[context][i,1] = regressions[mouse][context]['recall'].intercept_
+            except:
+                values[context][i] = (np.nan, np.nan)
+
+
+    #Get the CA1 and BLA mice by hard-core for now.
+    CA1 = values['shock'][:6]
+    CA1 = np.delete(CA1, np.where(~np.isfinite(CA1[:, 0])), axis=0)
+    BLA = values['shock'][6:]
+    BLA = np.delete(BLA, np.where(~np.isfinite(BLA[:, 0])), axis=0)
+
+    # Do stats.
+    pCA1 = wilcoxon(CA1[:,0], CA1[:,1])
+    pBLA = wilcoxon(BLA[:,0], BLA[:,1])
+
+    # Plot individual animals.
+    for i, mouse in enumerate(mice):
+        f, ax = plt.subplots(1,2)
+
+        for j, context in enumerate(['shock','neutral']):
+            ax[j].plot(big_dict[context][i], '.')
+            ax[j].set_title(mouse + ' ' + context)
+
+            try:
+                # Get x and y coordinates.
+                X_ext = np.arange(ext_boundary[context]).reshape(-1, 1)
+                y_ext = regressions[mouse][context]['ext'].predict(X_ext)
+
+                X_recall = np.arange(ext_boundary[context],
+                                     session_boundaries[context][2]).reshape(-1, 1) - ext_boundary[context]
+                y_recall = regressions[mouse][context]['recall'].predict(X_recall)
+
+                # Plot the points.
+                ax[j].plot(X_ext, y_ext, 'b')
+                ax[j].plot(X_recall + ext_boundary[context], y_recall, 'g')
+
+                # Plot session boundaries.
+                for boundary in session_boundaries[context]:
+                    ax[j].axvline(boundary)
+            except:
+                pass
+
+    # Plot.
+    f, ax = plt.subplots(1,2,figsize=(4, 5))
+    ax[0].boxplot(BLA, positions=[0, 1])
+    for pair in BLA:
+        ax[0].plot(pair, 'grey')
+
+    ax[0].set_ylabel('Population similarity (r)')
+    ax[0].set_xticklabels(('Predicted', 'Real'))
+    ax[0].set_title('BLA')
+
+    ax[1].boxplot(CA1, positions=[0, 1])
+    for pair in CA1:
+        ax[1].plot(pair, 'grey')
+
+    ax[1].set_xticklabels(('Predicted', 'Real'))
+    ax[1].set_title('CA1')
+
+    return pCA1, pBLA
+
+
+
 
 def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
                               ref_mask_start=None, corr=pearsonr,
                               truncate=True,
                               omit_speed_modulated=False):
+
     slice_size_min = slice_size/60
     # Get correlations and session identities.
     correlations = []
@@ -226,6 +424,7 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
 
         for session in session_2_stages[i]:
             correlations.append(time_lapse_corr(mouse, session,
+                                                ref_session='FC',
                                                 bin_size=bin_size,
                                                 slice_size=slice_size,
                                                 ref_neurons=ref_neurons,
@@ -722,7 +921,7 @@ def make_condition_logicals(all_correlations, slice_size, session_boundaries,
     return E1_1, E2_1, RE_1, E1_2, E2_2, RE_2
 
 
-def Corr_Activations_to_Freezing(region=CA1_mice, template_session='E1_1'):
+def Corr_Activations_to_Freezing(region=BLA_mice, template_session='E1_1'):
     """
     Correlate the number of ensemble activations (averaged across ensembles)
     during Recall with the amount of freezing in that session.
@@ -736,56 +935,48 @@ def Corr_Activations_to_Freezing(region=CA1_mice, template_session='E1_1'):
         Session to build ensemble patterns from.
 
     """
-    shock_activations = []
-    shock_freezing = []
-    neutral_activations = []
-    neutral_freezing = []
-    for mouse in region:
-        try:
-            (activation_strengths,
-             activations,
-             patterns,
-             significance,
-             norm_activations,
-             freezing,
-             session_dict,
-             ) = cross_day_ensemble_activity(mouse, template_session, ['RE_1'])
+    all_activations = {}
+    all_freezing = {}
+    recall_sessions = ['RE_1', 'RE_2']
+    contexts = ['shock','neutral']
+    for context, recall in zip(contexts, recall_sessions):
+        all_activations[context] = []
+        all_freezing[context] = []
 
-            shock_activations.append(np.mean(norm_activations['RE_1']))
-            shock_freezing.append(np.sum(freezing['RE_1']
-                                       /len(freezing['RE_1'])))
+        for mouse in region:
+            try:
+                (activation_strengths,
+                 activations,
+                 patterns,
+                 significance,
+                 norm_activations,
+                 freezing,
+                 session_dict,
+                 ) = cross_day_ensemble_activity(mouse, template_session, recall_sessions)
 
-        except:
-            shock_activations.append(np.nan)
-            shock_freezing.append(np.nan)
-
-        try:
-            (activation_strengths,
-             activations,
-             patterns,
-             significance,
-             norm_activations,
-             freezing,
-             session_dict,
-             ) = cross_day_ensemble_activity(mouse, template_session, ['RE_2'])
-
-            neutral_activations.append(np.mean(norm_activations['RE_2']))
-            neutral_freezing.append(np.sum(freezing['RE_2']
-                                       / len(freezing['RE_2'])))
-
-        except:
-            neutral_activations.append(np.nan)
-            neutral_freezing.append(np.nan)
+                all_activations[context].append(np.mean(norm_activations[recall]))
+                all_freezing[context].append(np.sum(freezing[recall]/len(freezing[recall])))
+            except:
+                all_activations[context].append(np.nan)
+                all_freezing[context].append(np.nan)
 
     fig, ax = plt.subplots()
-    ax.scatter(shock_freezing, shock_activations, color='xkcd:grey')
-    ax.scatter(neutral_freezing, neutral_activations, color='b')
-    ax.set_xlabel('Freezing')
-    ax.set_ylabel('Norm. ensemble activation')
-    p = pearsonr(shock_freezing, shock_activations)
+    for context, color in zip(['shock','neutral'],['xkcd:grey','b']):
+        ax.scatter(all_freezing[context], all_activations[context], color='xkcd:grey')
+
+        model = LinearRegression().fit(np.asarray(all_freezing[context]).reshape(-1,1),
+                                       np.asarray(all_activations[context]).reshape(-1,1))
+        y = model.predict(all_freezing[context])
+
+        ax.plt(all_freezing[context], y, color=color)
+
+        ax.set_xlabel('Freezing')
+        ax.set_ylabel('Norm. ensemble activation')
+
+    pass
 
 
-def RecallEnsembleTimecourse(region=CA1_mice, test_sessions = ('E1_1', 'E2_1'),
+def RecallEnsembleTimecourse(region=BLA_mice, test_sessions = ('E1_1', 'E2_1'),
                              samples_per_bin=2400):
     """
     Track the number of ensemble activations from recall over extinction.

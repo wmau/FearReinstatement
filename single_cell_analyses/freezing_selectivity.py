@@ -10,6 +10,7 @@ from plotting import plot_functions as plot_funcs
 from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff
 import matplotlib.pyplot as plt
 import data_preprocessing as d_pp
+from statsmodels.stats.multitest import fdrcorrection
 
 session_list = load_session_list()
 
@@ -316,8 +317,11 @@ def speed_modulation(mouse, stage, neurons=None, dtype='events'):
         p.append(spearmanr(neuron, v)[1])
 
     p = np.asarray(p)
+    modulated, p = fdrcorrection(p, 0.05)
 
-    modulated = p < 0.01/len(p)
+    #modulated = p < 0.01/len(p)
+
+    print(str(sum(modulated)) + ' neurons removed from ' + mouse)
 
     return modulated
 

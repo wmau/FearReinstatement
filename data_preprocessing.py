@@ -108,7 +108,10 @@ def load_and_trim(session_index, dtype='traces', neurons=None,
     return data, t
 
 def make_bins(data, samples_per_bin, axis=1):
-    length = data.shape[axis]
+    try:
+        length = data.shape[axis]
+    except:
+        length = data.shape[0]
 
     bins = np.arange(samples_per_bin, length, samples_per_bin)
 

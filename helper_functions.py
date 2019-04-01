@@ -162,3 +162,11 @@ def partial_z(arr, inds):
     arr[:,~inds] = np.nan
 
     return arr
+
+
+def pad_and_stack(arrs, pad_lengths):
+    x = [np.pad(arr, (0, pad_length), mode='constant',
+                constant_values=np.nan)
+         for arr, pad_length in zip(arrs, pad_lengths)]
+
+    return np.hstack(x)
