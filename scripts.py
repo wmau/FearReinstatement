@@ -202,7 +202,7 @@ def FindGeneralizers():
 def CrossSessionEventRateCorr2(bin_size=1, slice_size=30,
                                ref_mask_start=None,
                                corr=pearsonr, truncate=True,
-                               omit_speed_modulated=True):
+                               omit_speed_modulated=False):
     slice_size_min = slice_size/60
 
     # Get all the correlation time series.
@@ -921,7 +921,7 @@ def make_condition_logicals(all_correlations, slice_size, session_boundaries,
     return E1_1, E2_1, RE_1, E1_2, E2_2, RE_2
 
 
-def Corr_Activations_to_Freezing(region=BLA_mice, template_session='E1_1'):
+def Corr_Activations_to_Freezing(region=BLA_mice, template_session='E2_1'):
     """
     Correlate the number of ensemble activations (averaged across ensembles)
     during Recall with the amount of freezing in that session.
@@ -952,7 +952,9 @@ def Corr_Activations_to_Freezing(region=BLA_mice, template_session='E1_1'):
                  norm_activations,
                  freezing,
                  session_dict,
-                 ) = cross_day_ensemble_activity(mouse, template_session, recall_sessions)
+                 ) = cross_day_ensemble_activity(mouse, template_session, [recall])
+
+                print(mouse + ': ' + str(patterns.shape[0]) + ' assemblies detected')
 
                 all_activations[context].append(np.mean(norm_activations[recall]))
                 all_freezing[context].append(np.sum(freezing[recall]/len(freezing[recall])))
@@ -961,17 +963,21 @@ def Corr_Activations_to_Freezing(region=BLA_mice, template_session='E1_1'):
                 all_freezing[context].append(np.nan)
 
     fig, ax = plt.subplots()
-    for context, color in zip(['shock','neutral'],['xkcd:grey','b']):
-        ax.scatter(all_freezing[context], all_activations[context], color='xkcd:grey')
+    for context, color in zip(['shock', 'neutral'], ['xkcd:grey', 'b']):
+        ax.scatter(all_activations[context], all_freezing[context], color=color)
 
-        model = LinearRegression().fit(np.asarray(all_freezing[context]).reshape(-1,1),
-                                       np.asarray(all_activations[context]).reshape(-1,1))
-        y = model.predict(all_freezing[context])
+        X = np.asarray(all_activations[context])
+        y = np.asarray(all_freezing[context])
+        y = y[np.isfinite(X)]
+        X = X[np.isfinite(X)]
+        model = LinearRegression().fit(X.reshape(-1, 1), y.reshape(-1, 1))
+        predicted = model.predict(X.reshape(-1, 1))
 
-        ax.plt(all_freezing[context], y, color=color)
+        order = np.argsort(X)
+        ax.plot(X[order], predicted[order], color=color)
 
-        ax.set_xlabel('Freezing')
-        ax.set_ylabel('Norm. ensemble activation')
+    ax.set_xlabel('Freezing')
+    ax.set_ylabel('Norm. ensemble activation')
 
     pass
 
@@ -1060,4 +1066,4 @@ def RecallEnsembleTimecourse(region=BLA_mice, test_sessions = ('E1_1', 'E2_1'),
 
 
 if __name__ == '__main__':
-    Corr_Activations_to_Freezing()
+    RegressCorrTimeSeries()
