@@ -330,6 +330,9 @@ def RegressCorrTimeSeries():
     ext_boundary = {}
     ext_boundary['shock'] = session_boundaries['shock'][1]
     ext_boundary['neutral'] = session_boundaries['neutral'][1]
+    recall_start = {}
+    recall_start['shock'] = session_boundaries['shock'][1]
+    recall_start['neutral'] = session_boundaries['neutral'][1]
     for i, mouse in enumerate(mice):
         regressions[mouse] = {}
 
@@ -348,8 +351,8 @@ def RegressCorrTimeSeries():
                                                                             y.reshape(-1,1))
                 regressions[mouse][context]['ext'].pval = linregress(X, y)[3]
 
-                y = big_dict[context][i, ext_boundary[context]:]
-                X = np.arange(session_boundaries[context][-1] - ext_boundary[context])
+                y = big_dict[context][i, recall_start[context]:]
+                X = np.arange(session_boundaries[context][-1] - session_boundaries[context][-2])
                 X = X[np.isfinite(y)].reshape(-1,1)
                 y = y[np.isfinite(y)].reshape(-1,1)
 
@@ -362,13 +365,13 @@ def RegressCorrTimeSeries():
 
             try:
                 values[context][i,0] = regressions[mouse][context]['ext'].predict(np.array(
-                    [ext_boundary[context]+1]).reshape(-1,1))
+                    [recall_start[context]+1]).reshape(-1,1))
                 values[context][i,1] = regressions[mouse][context]['recall'].intercept_
             except:
                 values[context][i] = (np.nan, np.nan)
 
 
-    #Get the CA1 and BLA mice by hard-core for now.
+    #Get the CA1 and BLA mice by hard-code for now.
     CA1 = values['shock'][:7]
     CA1 = np.delete(CA1, np.where(~np.isfinite(CA1[:, 0])), axis=0)
     BLA = values['shock'][7:]
@@ -378,7 +381,7 @@ def RegressCorrTimeSeries():
     pCA1 = wilcoxon(CA1[:,0], CA1[:,1])
     pBLA = wilcoxon(BLA[:,0], BLA[:,1])
 
-    #Get the CA1 and BLA mice by hard-core for now.
+    #Get the CA1 and BLA mice by hard-code for now.
     CA1_neutral = values['neutral'][:7]
     CA1_neutral = np.delete(CA1_neutral, np.where(~np.isfinite(CA1_neutral[:, 0])), axis=0)
     BLA_neutral = values['neutral'][7:]
