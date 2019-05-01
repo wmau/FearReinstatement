@@ -11,7 +11,11 @@ from plotting.plot_helper import ScrollPlot
 from plotting import plot_functions as plot_funcs
 from PIL import Image
 import matplotlib.pyplot as plt
+plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams.update({'font.size': 12})
 import skimage.measure as measure
+from plotting.fov import insert_scale_bar
+from matplotlib import cm
 
 session_list = load_session_list()
 
@@ -227,6 +231,79 @@ def plot_footprints_over_days(mouse, session_stage, neurons):
 
     return f
 
+
+def plot_outlines_over_days(mouse, session_stages='all',
+                            neurons=None, active_all_days=False,
+                            cmap='Set1'):
+    """
+    Plots specified cell outlines across all specified
+    sessions. Uses the first session in session_stages as the
+    reference for neuron indices.
+
+    Parameters
+    ---
+    mouse: str, mouse name.
+    session_stages: list-like or 'all', sessions that you want to plot.
+
+    """
+    if session_stages == 'all':
+        session_index, meta = find_mouse_sessions(mouse)
+        sessions = [entry['Session'] for entry in meta]
+    else:
+        session_index, sessions = get_session(mouse, session_stages)
+    n_sessions = len(session_index)
+
+    if neurons is not None:
+        assert len(neurons) == n_sessions, \
+            'neurons must be same length as session_stages.'
+
+    # This list refers to the array # in the list of footprint arrays.
+    footprint_list_idx = [x - np.min(session_index) for x in session_index]
+    colormap = cm.get_cmap(cmap, n_sessions)
+    colors = colormap(range(n_sessions))
+
+    # Load the footprints and map.
+    footprints = load_cellreg_results(mouse, mode='footprints')
+    cell_map = load_cellreg_results(mouse)
+
+    # Get the session in map that corresponds to the session_index.
+    # Then get all row numbers corresponding to the neurons.
+
+    trimmed_map = trim_match_map(cell_map, session_index,
+                                 active_all_days=active_all_days)
+
+    fig, ax = plt.subplots()
+    for map_idx,session in enumerate(footprint_list_idx):
+        if neurons is None:
+            neurons_to_plot = trimmed_map[:,map_idx]
+        else:
+            idx = ismember(trimmed_map[:,0], neurons[map_idx])
+            good = idx[1][idx[0]]
+            neurons_to_plot = trimmed_map[good,map_idx]
+
+        neurons_to_plot = neurons_to_plot[neurons_to_plot > -1]
+
+        for n in neurons_to_plot:
+            neuron = footprints[session][n]
+            thr = np.mean(neuron) + 10*np.std(neuron)
+            contour = measure.find_contours(neuron, thr)[0]
+
+            ax.plot(contour[:,0], contour[:,1], linewidth=0.5,
+                    c=colors[map_idx], alpha=0.5)
+
+        ax.text(0, 0 + session*10, sessions[map_idx],
+                color=colors[map_idx])
+
+
+    ax.axis('image')
+    ax.axis('off')
+    ax.invert_yaxis()
+    insert_scale_bar(ax, x=270, y=330, color='k')
+
+    return fig
+
+
+
 def find_cell_in_map(map, map_index, neurons):
     """
     Gets the global cell index of a set of cells given a column index
@@ -333,4 +410,5 @@ class CellRegObj:
 
 
 if __name__ == '__main__':
-    plot_footprints_over_days('Kerberos','FC',5)
+    plot_outlines_over_days('Mundilfari', session_stages=['FC','RE_1'])
+
