@@ -199,4 +199,6 @@ def get_region(mouse):
 
 
 if __name__ == '__main__':
-    session_list = load_session_list()
+    slist = load_session_list()
+
+

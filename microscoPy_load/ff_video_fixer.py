@@ -200,11 +200,18 @@ class FFObj:
                                    self.velocity)
 
         # Convert to cm.
-        if not self.converted:
-            self.x = self.x * self.pix_to_cm
-            self.y = self.y * self.pix_to_cm
-            self.imaging_v = self.imaging_v * self.pix_to_cm
-            self.velocity = self.velocity * self.pix_to_cm
+        try:
+            if not self.converted:
+                self.x = self.x * self.pix_to_cm
+                self.y = self.y * self.pix_to_cm
+                self.imaging_v = self.imaging_v * self.pix_to_cm
+                self.velocity = self.velocity * self.pix_to_cm
+                self.converted = True
+        except:
+            self.x *= 0.15
+            self.y *= 0.15
+            self.imaging_v *= 0.15
+            self.velocity *= 0.15
             self.converted = True
 
         self.imaging_freezing = np.zeros(self.imaging_t.shape,
@@ -373,11 +380,11 @@ class FFObj:
         directory, _ = path.split(self.avi_location)
         movie_file = path.join(directory, 'Movie.pkl')
 
-        with open(movie_file, 'wb') as output:
-            pickle.dump(self, output, protocol=pickle.HIGHEST_PROTOCOL)
-
         if hasattr(self, 'movie'):
+            with open(movie_file, 'wb') as output:
+                pickle.dump(self, output, protocol=pickle.HIGHEST_PROTOCOL)
             del self.movie
+
         if hasattr(self, 'f'):
             del self.f
 

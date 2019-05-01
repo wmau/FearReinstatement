@@ -203,7 +203,7 @@ def cross_day_ensemble_activity(mouse, template_session, test_sessions,
                                 neurons=None, dtype='traces',
                                 session=None, trim=True, start=None,
                                 end=None, method='ica', nullhyp='circ',
-                                n_shuffles=1000, percentile=99):
+                                n_shuffles=500, percentile=99.5):
     """
     Gets the ensemble activity across days, keeping the neuron weights
     from a template session and applying it to test sessions.
@@ -362,6 +362,9 @@ def cross_day_ensemble_activity(mouse, template_session, test_sessions,
     # Look at weights for cells that respond to freezing. Use the recall
     # session. Using the same extinction session to find freezing cells
     # and assembly weights might be circular.
+
+    # Look at pre-freezing traces, but instead of traces, ensemble activations
+
 
 if __name__ == '__main__':
     (strengths,

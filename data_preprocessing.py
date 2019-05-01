@@ -22,10 +22,14 @@ def filter_good_neurons(accepted):
 
 
 def trim_session(data, indices):
-    if data.ndim is 1:
-        data = data[indices]
-    elif data.ndim is 2:
-        data = data[:, indices]
+    try:
+        if data.ndim is 1:
+            data = data[indices]
+        elif data.ndim is 2:
+            data = data[:, indices]
+    except:
+        if len(data.shape) is 1:
+            data = data[indices]
 
     return data
 
@@ -156,11 +160,15 @@ def trim_and_bin(session_index, data=None, t=None, session=None, dtype='traces',
         elif dtype == 'events':
             data, t = ca_events.load_events(session_index)
             data[data > 0] = 1
+        elif dtype == 'freezing':
+            data = session.imaging_freezing
+            t = session.imaging_t
         else:
             raise ValueError('Wrong data type.')
 
-    if neurons is not None:
-        data = data[neurons]
+    if (dtype == 'traces') or (dtype == 'events'):
+        if neurons is not None:
+            data = data[neurons]
 
     # Make mask for trimming. If from_this_time is None, just use the
     # entire session starting from when the mouse enters the chamber.

@@ -165,8 +165,30 @@ def partial_z(arr, inds):
 
 
 def pad_and_stack(arrs, pad_lengths):
-    x = [np.pad(arr, (0, pad_length), mode='constant',
-                constant_values=np.nan)
-         for arr, pad_length in zip(arrs, pad_lengths)]
+    """
+    Stacks a list of arrays horizontally (column-wise) after
+    padding or truncating, depending on the values in pad_lengths.
+    If a pad length is positive, it will add nans. If negative,
+    it will truncate up to that data point for each array.
+
+    :param arrs:
+    :param pad_lengths:
+    :return:
+    """
+    for arr, pad_length in zip(arrs, pad_lengths):
+        if pad_length < 0:
+            truncated = arr[:pad_length]
+            try:
+                x.append(truncated)
+            except:
+                x = [truncated]
+        else:
+            padded = np.pad(arr, (0, pad_length),
+                            mode='constant',
+                            constant_values=np.nan)
+            try:
+                x.append(padded)
+            except:
+                x = [padded]
 
     return np.hstack(x)
