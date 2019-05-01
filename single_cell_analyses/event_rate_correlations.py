@@ -11,7 +11,7 @@ from scipy.stats.mstats import zscore
 
 def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
                     slice_size=60, ref_mask_start=None, plot_flag=True,
-                    ref_neurons=None, corr=pearsonr):
+                    ref_indices=None, ref_neurons=None, corr=pearsonr):
     """
     Takes the reference session and computes the average event rate for
     each cell during that session. Then correlate those rates to rates
@@ -45,6 +45,17 @@ def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
         ref_mask[start_idx:end_idx] = True
     else:
         ref_mask = None
+
+    if ref_indices is not None:
+        assert ref_mask is None, "ref_mask_start must be None to use this feature"
+
+        ref_mask = np.zeros(ff_ref.mouse_in_cage.shape, dtype=bool)
+        if ref_indices == 'homecage1':
+            end_idx = np.where(ff_ref.mouse_in_cage)[0][0]
+            ref_mask[:end_idx] = True
+        elif ref_indices == 'homecage2':
+            start_idx = np.where(ff_ref.mouse_in_cage)[0][-1]
+            ref_mask[start_idx:] = True
 
     map = cell_reg.load_cellreg_results(mouse)
     trimmed_map = cell_reg.trim_match_map(map, session_index)
