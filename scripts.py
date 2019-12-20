@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 plt.rcParams['pdf.fonttype'] = 42
+plt.rcParams['svg.fonttype'] = 'none'
+plt.rcParams['text.usetex'] = False
 plt.rcParams.update({'font.size': 12})
 import numpy as np
 import seaborn as sns
@@ -32,13 +34,13 @@ session_list = load_session_list()
 
 # Specify mice and days to be included in analysis.
 mice = (
-        'Kerberos',
-        'Nix',
-        'Pandora',
-        'Calypso',
-        'Helene',
-        'Hyperion',
-        'Pan',
+        # 'Kerberos',
+        # 'Nix',
+        # 'Pandora',
+        # 'Calypso',
+        # 'Helene',
+        # 'Hyperion',
+        # 'Pan',
         'Janus',
         'Kepler',
         'Mundilfari',
@@ -433,16 +435,17 @@ def RegressCorrTimeSeries():
     for pair in BLA:
         ax[0].plot(pair, 'grey')
 
-    ax[0].set_ylabel('Population similarity (r)')
-    ax[0].set_xticklabels(('Predicted', 'Real'))
+    ax[0].set_ylabel('Correlation to CFC PV during Recall (r)')
+    ax[0].set_xticklabels(('Predicted', 'Real'), rotation=45)
     ax[0].set_title('BLA')
 
     ax[1].boxplot(CA1, positions=[0, 1])
     for pair in CA1:
         ax[1].plot(pair, 'grey')
 
-    ax[1].set_xticklabels(('Predicted', 'Real'))
+    ax[1].set_xticklabels(('Predicted', 'Real'), rotation=45)
     ax[1].set_title('CA1')
+    f.tight_layout()
 
     # Plot.
     f, ax = plt.subplots(1, 2, figsize=(4, 5))
@@ -450,16 +453,17 @@ def RegressCorrTimeSeries():
     for pair in BLA_neutral:
         ax[0].plot(pair, 'grey')
 
-    ax[0].set_ylabel('Population similarity (r)')
-    ax[0].set_xticklabels(('Predicted', 'Real'))
+    ax[0].set_ylabel('Correlation to CFC PV during Recall (r)')
+    ax[0].set_xticklabels(('Predicted', 'Real'), rotation=45)
     ax[0].set_title('BLA')
 
     ax[1].boxplot(CA1_neutral, positions=[0, 1])
     for pair in CA1_neutral:
         ax[1].plot(pair, 'grey')
 
-    ax[1].set_xticklabels(('Predicted', 'Real'))
+    ax[1].set_xticklabels(('Predicted', 'Real'), rotation=45)
     ax[1].set_title('CA1')
+    f.tight_layout()
 
     for mouse in mice:
         print(mouse)
@@ -601,6 +605,8 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
     BLA_RE_2 = BLA[:, RE_2].flatten()
 
     # Plot time series of correlation coefficients for CA1.
+    context1_boundaries = context1_boundaries.astype(int)
+    context2_boundaries = context2_boundaries.astype(int)
     f, ax = plt.subplots(2, 2, figsize=(9, 7))
     plot_Rs(ax[0, 0], CA1[:, context_1], context1_boundaries, slice_size_min)
     ax[0, 0].set_title('CA1')
@@ -627,12 +633,12 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
 
     ###
     f, ax = plt.subplots(2, 2, figsize=(9, 7))
-    plot_Rs(ax[0, 0], CA1[:, context_2], context2_boundaries, slice_size_min, color='navy')
+    plot_Rs(ax[0, 0], CA1[:, context_2], context2_boundaries, slice_size_min, color='gray')
     ax[0, 0].set_ylabel('Correlation Coefficient')
     ax[0, 0].set_title('CA1')
 
     # Plot time series of correlation coefficients for BLA.
-    plot_Rs(ax[0, 1], BLA[:, context_2], context2_boundaries, slice_size_min, color='navy')
+    plot_Rs(ax[0, 1], BLA[:, context_2], context2_boundaries, slice_size_min, color='gray')
     ax[0, 1].set_title('BLA')
 
     # Boxplot by session type for CA1.
@@ -737,11 +743,11 @@ def Plot_Freezing(bin_length=30):
     # Plot.
     f, ax = plt.subplots(1, 1)
     ax.errorbar(x, c2_freezing_mean, yerr=c2_freezing_sem, fmt='o',
-                ecolor='gray', markersize=3, capsize=0, mfc='gray',
+                ecolor='#5E5A47', markersize=3, capsize=0, mfc='#5E5A47',
                 mew=0, alpha=0.5)
     ax.errorbar(x, c1_freezing_mean, yerr=c1_freezing_sem, fmt='o',
-                ecolor='navy', markersize=3, capsize=0,
-                mfc='navy', mew=0, alpha=0.5)
+                ecolor='orange', markersize=3, capsize=0,
+                mfc='orange', mew=0, alpha=0.5)
 
     for boundary in boundaries:
         ax.axvline(x=boundary)
@@ -760,13 +766,13 @@ def Plot_Freezing(bin_length=30):
     E2_2 = context2_freezing[:, boundaries[2]:boundaries[3]]
     RE_2 = context2_freezing[:, boundaries[3]:boundaries[4]]
 
-    E1_1_mean = np.nanmean(np.array_split(E1_1,5,axis=1)[0], axis=1)
-    E2_1_mean = np.nanmean(np.array_split(E2_1,5,axis=1)[-1], axis=1)
-    RE_1_mean = np.nanmean(RE_1[:,2:], axis=1)
+    E1_1_mean = np.nanmean(np.array_split(E1_1,6,axis=1)[0], axis=1)
+    E2_1_mean = np.nanmean(np.array_split(E2_1,6,axis=1)[-1], axis=1)
+    RE_1_mean = np.nanmean(RE_1[:,0:], axis=1)
 
-    E1_2_mean = np.nanmean(np.array_split(E1_2,5,axis=1)[0], axis=1)
-    E2_2_mean = np.nanmean(np.array_split(E2_2,5,axis=1)[-1], axis=1)
-    RE_2_mean = np.nanmean(RE_2[:,2:], axis=1)
+    E1_2_mean = np.nanmean(np.array_split(E1_2,6,axis=1)[0], axis=1)
+    E2_2_mean = np.nanmean(np.array_split(E2_2,6,axis=1)[-1], axis=1)
+    RE_2_mean = np.nanmean(RE_2[:,0:], axis=1)
 
     E1_test = wilcoxon(E1_1_mean[~np.isnan(E1_2_mean)],
                        E1_2_mean[~np.isnan(E1_2_mean)]).pvalue
@@ -951,6 +957,17 @@ def plot_Rs(ax, Rs, boundaries, slice_size_min, color='lightgray', alpha=1):
     x = np.r_[0:Rs.shape[1]]
     ax.errorbar(x, m, yerr=yerr, fmt='o', ecolor=color,
                 markersize=3, capsize=0, mfc='k', mew=0, alpha=alpha)
+
+    ext = x[:boundaries[1]]
+    slope, intercept, r_value, p_value, std_err = linregress(ext, m[:boundaries[1]])
+    line = slope * ext + intercept
+    ax.plot(ext, line, color='skyblue')
+
+    recall = x[boundaries[1]:]
+    slope, intercept, r_value, p_value, std_err = linregress(recall, m[boundaries[1]:])
+    line = slope * recall + intercept
+    ax.plot(recall, line, color='magenta')
+
     for boundary in boundaries:
         ax.axvline(x=boundary)
     ax.set_xticks([0,
@@ -959,6 +976,7 @@ def plot_Rs(ax, Rs, boundaries, slice_size_min, color='lightgray', alpha=1):
                    30/slice_size_min + 30/slice_size_min + 8/slice_size_min])
     ax.set_xticklabels([0, 30, 30, 8])
     ax.set_xlabel('Time (min)')
+    ax.set_ylabel('Correlation to CFC PV (r)')
 
 def make_condition_logicals(all_correlations, slice_size, session_boundaries,
                             truncate=False):
@@ -1091,7 +1109,7 @@ def Corr_Activations_to_Freezing(region='BLA', template_session='FC', save_fig=F
 
     if save_fig:
         fname = os.path.join('C:\\Users\\William Mau\\Documents\\Projects\\S. Ramirez Fear Conditioning\\Figures',
-                             'Ensemble correlation to freezing_' + region + '_' + template_session + '.pdf')
+                             'Ensemble correlation to freezing_' + region + '_' + template_session + '.svg')
         fig.savefig(fname)
 
     return fig
@@ -1181,8 +1199,9 @@ def RecallEnsembleTimecourse(region=BLA_mice, test_sessions = ('E1_1', 'E2_1'),
 
 
 if __name__ == '__main__':
-    #Plot_Freezing()
-    # for session in ['FC', 'E1_1', 'E2_1']:
+    Plot_Freezing()
+    # for session in ['FC']:
     #     Corr_Activations_to_Freezing(template_session=session, save_fig=True)
 
-    RegressCorrTimeSeries()
+    #RegressCorrTimeSeries()
+    #CrossSessionEventRateCorr()

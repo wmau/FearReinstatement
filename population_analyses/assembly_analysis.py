@@ -338,6 +338,90 @@ def cross_day_ensemble_activity(mouse, template_session, test_sessions,
            significance, norm_activations, freezing, session_dict
 
 
+def prefreezing_assembly_activations(mouse, template_session, test_sessions,
+                                     neurons=None, dtype='traces',
+                                     session=None, trim=True, start=None,
+                                     end=None, method='ica', nullhyp='circ',
+                                     n_shuffles=500, percentile=99.5
+                                     ):
+
+    (ensemble_strengths,
+     ensemble_activations,
+     patterns,
+     significance,
+     norm_activations,
+     freezing,
+     session_dict) = \
+        cross_day_ensemble_activity(mouse, template_session, test_sessions,
+                                    neurons=neurons, dtype=dtype, trim=trim,
+                                    start=start, end=end, method=method,
+                                    nullhyp=nullhyp, n_shuffles=n_shuffles,
+                                    percentile=percentile)
+
+    plot_prefreezing_ensemble_activations(ensemble_strengths['E1_1'],
+                                          session_dict['E1_1'])
+
+    return
+
+
+def plot_prefreezing_ensemble_activations(ensemble_strength, session,
+                                          window=(-2,2),
+                                          freeze_duration_threshold=1.25,
+                                          plot_bool=True):
+    """
+    Plots the average activity for an ensemble centered around the start of
+    freezing bouts.
+
+    Parameters
+    ---
+    window: tuple, (-seconds before freezing, seconds after)
+    freeze_duration_threshold: scalar, freezing duration must be longer
+        than this value (seconds)
+    plot_bool: boolean, whether or not to plot
+
+    Returns
+    ---
+
+    """
+
+    # Load data and get freezing timestamps.
+
+    freeze_epochs = session.get_freezing_epochs_imaging_framerate()
+
+    # Chop off indices where mouse is not in chamber.
+    mouse_in_chamber = np.where(session.mouse_in_cage)[0]
+    freeze_epochs = freeze_epochs[np.any(freeze_epochs > mouse_in_chamber[0],
+                                         axis=1),:]
+    freeze_epochs = freeze_epochs[np.any(freeze_epochs < mouse_in_chamber[-1],
+                                         axis=1),:]
+    freeze_epochs -= mouse_in_chamber[0]
+
+    # Eliminate freeze epochs that don't pass the duration threshold.
+    good_epochs = np.squeeze(np.diff(freeze_epochs) >
+                             freeze_duration_threshold * 20)
+    freeze_epochs = freeze_epochs[good_epochs, :]
+
+    # Get sizes for all dimensions of our array.
+    n_assemblies = ensemble_strength.shape[0]
+    n_freezes = freeze_epochs.shape[0]
+    freeze_duration = abs(np.ceil(np.diff(window)*20)).astype(int)[0]
+
+    # Plot each cell and each freeze epoch.
+    prefreezing_traces = np.zeros((n_assemblies,
+                                   n_freezes,
+                                   freeze_duration))
+    t = np.arange(window[0], window[1], 1/20)
+    for n, trace in enumerate(ensemble_strength):
+        for i, epoch in enumerate(freeze_epochs):
+            start = epoch[0] - (abs(window[0]) * 20)
+            stop = epoch[0] + (abs(window[1]) * 20)
+            prefreezing_traces[n, i, :] = trace[start:stop]
+
+    for trace in prefreezing_traces:
+        plt.figure()
+        plt.plot(trace.T)
+
+    return
 
 
 ## IDEAS:
@@ -374,8 +458,8 @@ if __name__ == '__main__':
      norm,
      freezing,
      session_dict) = \
-        cross_day_ensemble_activity('Mundilfari','FC',
-                                    ['E1_1','E2_1','RE_1'])
+        prefreezing_assembly_activations('Helene','FC',
+                                         ['E1_1','E2_1','RE_1'])
 
     # mice = (
     #     'Kerberos',

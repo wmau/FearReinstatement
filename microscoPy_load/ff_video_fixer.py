@@ -578,3 +578,4 @@ if __name__ == '__main__':
     FF = load_movie(1)
     f = FF.plot_position()
     FF.correct_position(f)
+
