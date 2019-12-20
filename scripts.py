@@ -34,13 +34,13 @@ session_list = load_session_list()
 
 # Specify mice and days to be included in analysis.
 mice = (
-        # 'Kerberos',
-        # 'Nix',
-        # 'Pandora',
-        # 'Calypso',
-        # 'Helene',
-        # 'Hyperion',
-        # 'Pan',
+        'Kerberos',
+        'Nix',
+        'Pandora',
+        'Calypso',
+        'Helene',
+        'Hyperion',
+        'Pan',
         'Janus',
         'Kepler',
         'Mundilfari',
