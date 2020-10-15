@@ -1,0 +1,20 @@
+name: FearReinstatement
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python==3.6.8
+  - pygame
+  - matplotlib
+  - pandas
+  - opencv
+  - sk-video
+  - tifffile
+  - seaborn
+  - scikit-image
+  - h5py
+  - scikit-learn
+  - cython
+  - numpy==1.15.2
+  - ffmpeg
+prefix: C:\ProgramData\Anaconda3\envs\FearReinstatement
