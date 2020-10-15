@@ -11,7 +11,8 @@ from scipy.stats.mstats import zscore
 
 def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
                     slice_size=60, ref_mask_start=None, plot_flag=True,
-                    ref_indices=None, ref_neurons=None, corr=pearsonr):
+                    ref_indices=None, ref_neurons=None, corr=pearsonr,
+                    active_all_days=True, B=1000):
     """
     Takes the reference session and computes the average event rate for
     each cell during that session. Then correlate those rates to rates
@@ -38,9 +39,14 @@ def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
     data, t = ca_events.load_events(session_index[0])
     data[data > 0] = 1
 
-    if ref_mask_start is not None:
+    if ref_mask_start == 'pre_shock':
         ref_mask = np.zeros(ff_ref.mouse_in_cage.shape, dtype=bool)
-        start_idx = find_closest(ff_ref.imaging_t, ref_mask_start)[1]
+        start_idx = np.where(ff_ref.mouse_in_cage)[0][-1]
+        end_idx = 698
+        ref_mask[start_idx:end_idx] = True
+    elif ref_mask_start == 'post_shock':
+        ref_mask = np.zeros(ff_ref.mouse_in_cage.shape, dtype=bool)
+        start_idx = 698
         end_idx = np.where(ff_ref.mouse_in_cage)[0][-1]
         ref_mask[start_idx:end_idx] = True
     else:
@@ -58,7 +64,8 @@ def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
             ref_mask[start_idx:] = True
 
     map = cell_reg.load_cellreg_results(mouse)
-    trimmed_map = cell_reg.trim_match_map(map, session_index)
+    trimmed_map = cell_reg.trim_match_map(map, session_index,
+                                          active_all_days=active_all_days)
 
     if ref_neurons is None:
         ref_neurons = trimmed_map[:,0]
@@ -105,12 +112,23 @@ def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
                                                    mask=mask,
                                                    neurons=neurons)
 
+    event_rates[:, neurons==-1] = 0
         # if z:
         #     event_rates[i,:] = zscore(event_rates[i,:])
 
     correlations = np.zeros((len(event_rates)))
+    shuffles = []
+    for iteration in range(B):
+        placeholder = np.empty_like(correlations)
+
+        for i, vector in enumerate(event_rates):
+            placeholder[i] = corr(np.random.permutation(vector), ref_event_rates)[0]
+        shuffles.append(placeholder)
+    shuffles = np.vstack(shuffles)
+
     for i, vector in enumerate(event_rates):
         correlations[i] = corr(vector, ref_event_rates)[0]
+
 
     if len(binned_in_cage[-1]) < len(binned_in_cage[0])/2:
         correlations[-1] = np.nan
@@ -119,7 +137,7 @@ def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
         plt.plot(correlations)
         plt.show()
 
-    return correlations, ref_event_rates, event_rates
+    return correlations, ref_event_rates, event_rates, shuffles
 
 def session_corr(mouse, session, ref_session='FC', corr=pearsonr):
     session_index = get_session(mouse, (ref_session, session))[0]

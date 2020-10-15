@@ -4,14 +4,16 @@ plt.rcParams['svg.fonttype'] = 'none'
 plt.rcParams['text.usetex'] = False
 plt.rcParams.update({'font.size': 12})
 import numpy as np
+import pandas as pd
 import seaborn as sns
 from pandas import MultiIndex
+from microscoPy_load.cell_reg import load_cellreg_results
 from scipy.stats import pearsonr, mannwhitneyu, spearmanr, kendalltau, \
-    ttest_ind, wilcoxon, ks_2samp, linregress
+    ttest_ind, wilcoxon, ks_2samp, linregress, ttest_rel
 from sklearn.linear_model import LinearRegression
 # from statsmodels.formula.api import ols
 # from statsmodels.stats.anova import anova_lm
-from statsmodels.stats.multitest import fdrcorrection
+from statsmodels.stats.multitest import fdrcorrection, multipletests
 from helper_functions import ismember, nan, bool_array, sem, detect_onsets, \
     pad_and_stack
 from plotting.plot_functions import scatter_box
@@ -21,7 +23,7 @@ from session_directory import get_session, \
 from single_cell_analyses.event_rate_correlations \
     import time_lapse_corr, session_corr
 from single_cell_analyses.freezing_selectivity import speed_modulation
-from microscoPy_load import cell_reg
+from rdd import rdd
 from behavior.freezing import compute_percent_freezing, plot_freezing_percentages
 from population_analyses.assembly_analysis import cross_day_ensemble_activity
 from data_preprocessing import convolve
@@ -89,6 +91,92 @@ session_2_stages = [get_session(mouse, days)[1]
                     for mouse in mice]
 
 master_dir = 'U:\\Fear conditioning project_Mosaic2\\SessionDirectories'
+
+def count_cells():
+    cell_counts= []
+    for mouse in mice:
+        C = load_cellreg_results(mouse)
+        cell_counts.append(np.sum(C > -1, axis=0))
+
+    return cell_counts
+
+
+def cell_overlaps():
+    no_neutral = [0, 1, 3, 5, 6]
+    no_recall = [0, 1, 3, 5]
+    complete = list(range(8))
+    all_columns = [no_neutral,
+                   no_neutral,
+                   no_recall,
+                   complete,
+                   complete,
+                   complete,
+                   complete,
+                   no_neutral,
+                   no_neutral,
+                   complete,
+                   complete,
+                   complete,
+                   complete]
+
+    overlaps = nan((n_mice, 8, 8))
+    overlap_percentages = nan((n_mice, 8, 8))
+    for m, (mouse, columns) in enumerate(zip(mice, all_columns)):
+        C = load_cellreg_results(mouse)
+        n_sessions = C.shape[1]
+
+        for s1, row in zip(range(n_sessions), columns):
+            for s2, column in zip(range(n_sessions), columns):
+                overlap = np.sum((C[:, s1] > -1) & (C[:, s2] > -1))
+                overlaps[m, row, column] = overlap
+                overlap_percentages[m, row, column] = overlap/np.sum(C[:,s1] > -1)
+
+    avg_overlaps = {'CA1': nan((8,8)),
+                    'BLA': nan((8,8)),
+                    }
+    regions = ['CA1', 'BLA']
+    for region, ranges in zip(regions,
+                              [slice(0,7,None),
+                               slice(7,None,None)]):
+        for s1 in range(8):
+            for s2 in np.arange(s1+1, 8):
+                avg_overlaps[region][s1, s2] = np.nanmean(overlap_percentages[ranges][:,s1,s2])
+
+
+    session_labels = ['CFC',
+                      'EXT1 (shock ctx)', 'EXT1 (neutral ctx)',
+                      'EXT2 (shock ctx)', 'EXT2 (neutral ctx)',
+                      'Reinst',
+                      'Recall (shock ctx)', 'Recall (neutral ctx)']
+    for region in regions:
+        fig, ax = plt.subplots()
+        im = ax.imshow(avg_overlaps[region])
+        ax.set_xticks(range(8))
+        ax.set_yticks(range(8))
+        ax.set_xticklabels(session_labels, rotation=90)
+        ax.set_yticklabels(session_labels)
+        fig.colorbar(im, ax=ax)
+        fig.tight_layout()
+
+    pvals = []
+    strs = []
+    for region, ranges in zip(regions,
+                              [slice(0, 7, None),
+                               slice(7, None, None)]):
+        for s1 in range(8):
+            for s2 in np.arange(s1 + 1, 8):
+                for s3 in np.arange(s2 + 1, 8):
+                    p = wilcoxon(overlap_percentages[ranges][:, s1, s2],
+                                 overlap_percentages[ranges][:, s1, s3]).pvalue
+                    pvals.append(p)
+                    strs.append(region + ' ' + session_labels[s1] + '/' + session_labels[s2] + ' vs ' +
+                                session_labels[s1] + '/' + session_labels[s3] + ': ')
+
+        corrected = multipletests(pvals, method='fdr_bh')[1]
+        for message, corrected_pval, raw_pval in zip(strs, corrected, pvals):
+            print(message + str(raw_pval) + ', corrected: ' + str(corrected_pval))
+
+    return overlaps
 
 def Fix_Calypso_E2b():
     import os
@@ -204,15 +292,17 @@ def FindGeneralizers():
     pass
 
 
-def CrossSessionEventRateCorr2(bin_size=1, slice_size=30,
+def CrossSessionEventRateCorr2(bin_size=1, slice_size=60,
                                ref_mask_start=None,
                                corr=pearsonr, ref_indices=None,
-                               omit_speed_modulated=False):
+                               omit_speed_modulated=False,
+                               active_all_days=True, B=1000):
     min_per_slice = slice_size/60
 
     # Get all the correlation time series.
     correlations = {}
     freezing = {}
+    shuffles = {}
     for mouse in mice:
         # Omit speed modulated neurons, if specified.
         if omit_speed_modulated:
@@ -224,9 +314,10 @@ def CrossSessionEventRateCorr2(bin_size=1, slice_size=30,
         # Preallocate a dict per mouse.
         correlations[mouse] = {}
         freezing[mouse] = {}
+        shuffles[mouse] = {}
         for session in days:
             try:
-                correlations[mouse][session] = \
+                correlations[mouse][session], _, _, shuffles[mouse][session] = \
                     time_lapse_corr(mouse, session,
                                     ref_session='FC', bin_size=bin_size,
                                     slice_size=slice_size,
@@ -234,11 +325,14 @@ def CrossSessionEventRateCorr2(bin_size=1, slice_size=30,
                                     ref_mask_start=ref_mask_start,
                                     ref_indices=ref_indices,
                                     plot_flag=False,
-                                    corr=corr)[0]
+                                    corr=corr,
+                                    active_all_days=active_all_days,
+                                    B=B)
 
 
             except:
                 correlations[mouse][session] = nan((0))
+                shuffles[mouse][session] = nan((B,1))
 
 
             try:
@@ -273,8 +367,11 @@ def CrossSessionEventRateCorr2(bin_size=1, slice_size=30,
 
     # Arrange correlations nicely into a (mouse, time) array.
     big_dict = {}
+    big_dict['shuffles'] = {}
     big_dict['shock'] = nan((n_mice, session_boundaries['shock'][-1]))
     big_dict['neutral'] = nan((n_mice, session_boundaries['neutral'][-1]))
+    big_dict['shuffles']['shock'] = []
+    big_dict['shuffles']['neutral'] = []
 
     big_freezing = {}
     big_freezing['shock'] = nan((n_mice, session_boundaries['shock'][-1]))
@@ -288,6 +385,9 @@ def CrossSessionEventRateCorr2(bin_size=1, slice_size=30,
             length_difference = [longest_sessions[session] - len(correlations[mouse][session])
                                  for session in contexts[context]]
 
+            length_difference_shuffles = [longest_sessions[session] - shuffles[mouse][session].shape[1]
+                                          for session in contexts[context]]
+
             big_dict[context][i] = pad_and_stack([correlations[mouse][session]
                                                   for session in contexts[context]],
                                                  length_difference)
@@ -295,6 +395,10 @@ def CrossSessionEventRateCorr2(bin_size=1, slice_size=30,
             big_freezing[context][i] = pad_and_stack([freezing[mouse][session]
                                                       for session in contexts[context]],
                                                      length_difference)
+
+            big_dict['shuffles'][context].append(pad_and_stack([shuffles[mouse][session]
+                                                                for session in contexts[context]],
+                                                                length_difference_shuffles))
 
     big_dict['boundaries'] = session_boundaries
     big_dict['min_per_slice'] = min_per_slice
@@ -314,6 +418,64 @@ def CrossSessionEventRateCorr2(bin_size=1, slice_size=30,
 
     return big_dict
 
+
+def PlotPVCorrs(region='BLA', B=1000):
+    try:
+        with open(os.path.join(master_dir, 'PV_Corrs.pkl'), 'rb') as file:
+            big_dict = load(file)
+    except:
+        big_dict = CrossSessionEventRateCorr2()
+
+    region_specific_ind = ismember(region, regions)[0]
+    n_mice = np.sum(region_specific_ind)
+    shuffles = {'shock': [shuffle for shuffle, in_region
+                          in zip(big_dict['shuffles']['shock'],
+                                 region_specific_ind)
+                          if in_region],
+                'neutral': [shuffle for shuffle, in_region
+                            in zip(big_dict['shuffles']['neutral'],
+                                   region_specific_ind)
+                            if in_region]}
+
+    data = {'shock': big_dict['shock'][region_specific_ind],
+            'neutral': big_dict['neutral'][region_specific_ind],
+            'min_per_slice': big_dict['min_per_slice'],
+            'boundaries': big_dict['boundaries'],
+            'shock_shuffles': np.vstack(shuffles['shock']),
+            'neutral_shuffles': np.vstack(shuffles['neutral'])}
+
+    fig, ax = plt.subplots(1,2)
+    for condition, ax_ in zip(['shock', 'neutral'], ax):
+        plot_Rs(ax_, data[condition], data['boundaries'][condition], data['min_per_slice'])
+
+        m = np.nanmean(data[condition+'_shuffles'], axis=0)
+        std_err = sem(data[condition+'_shuffles'], axis=0)
+        x = np.asarray(range(std_err.shape[0]))
+
+        ax_.plot(x, m)
+        ax_.fill_between(x, m + std_err, m - std_err, alpha=0.2)
+
+    # s = data['shock_shuffles']
+    # s[np.isnan(s)] = 0
+    # p = np.sum(np.nanmean(data['shock'], axis=0) < s, axis=0) / (np.sum(region_specific_ind) * B)
+    t = np.squeeze(np.matlib.repmat(x, 1, n_mice))
+    df = pd.DataFrame({'x': t,
+                       'y': data['shock'].flatten()})
+    df_neutral = pd.DataFrame({'x': t,
+                       'y': data['neutral'].flatten()})
+
+    model = rdd.rdd(df, 'x', 'y', cut=data['boundaries']['shock'][1]).fit()
+    print('Discontinuity between Ext2 and Reinstatement p = %s' % model.pvalues.TREATED)
+
+    model = rdd.rdd(df, 'x', 'y', cut=data['boundaries']['shock'][0]).fit()
+    print('Discontinuity between Ext1 and Ext2 p = %s' % model.pvalues.TREATED)
+
+    neutral = rdd.rdd(df_neutral, 'x', 'y', cut=data['boundaries']['neutral'][-2]).fit()
+    print('Discontinuity between Ext2 and Reinstatement in Neutral Context p = %s' % neutral.pvalues.TREATED)
+
+    neutral = rdd.rdd(df_neutral, 'x', 'y', cut=data['boundaries']['neutral'][0]).fit()
+    print('Discontinuity between Ext1 and Ext2 in Neutral Context p = %s' % neutral.pvalues.TREATED)
+    pass
 
 def RegressCorrTimeSeries():
     try:
@@ -482,7 +644,8 @@ def RegressCorrTimeSeries():
 def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
                               ref_mask_start=None, corr=pearsonr,
                               truncate=True,
-                              omit_speed_modulated=False):
+                              omit_speed_modulated=False,
+                              active_all_days=False):
 
     slice_size_min = slice_size/60
     # Get correlations and session identities.
@@ -517,7 +680,9 @@ def CrossSessionEventRateCorr(bin_size=1, slice_size=30,
                                                 ref_neurons=ref_neurons,
                                                 ref_mask_start=ref_mask_start,
                                                 plot_flag=False,
-                                                corr=corr)[0])
+                                                corr=corr,
+                                                active_all_days=active_all_days
+                                                )[0])
             mouse_id.append(mouse)
             session_id.append(session)
 
@@ -977,6 +1142,7 @@ def plot_Rs(ax, Rs, boundaries, slice_size_min, color='lightgray', alpha=1):
     ax.set_xticklabels([0, 30, 30, 8])
     ax.set_xlabel('Time (min)')
     ax.set_ylabel('Correlation to CFC PV (r)')
+    plt.tight_layout()
 
 def make_condition_logicals(all_correlations, slice_size, session_boundaries,
                             truncate=False):
@@ -1025,7 +1191,7 @@ def make_condition_logicals(all_correlations, slice_size, session_boundaries,
     return E1_1, E2_1, RE_1, E1_2, E2_2, RE_2
 
 
-def Corr_Activations_to_Freezing(region='BLA', template_session='FC', save_fig=False):
+def Corr_Activations_to_Freezing(region='CA1', template_session='FC', save_fig=False):
     """
     Correlate the number of ensemble activations (averaged across ensembles)
     during Recall with the amount of freezing in that session.
@@ -1063,18 +1229,18 @@ def Corr_Activations_to_Freezing(region='BLA', template_session='FC', save_fig=F
                  norm_activations,
                  freezing,
                  session_dict,
-                 ) = cross_day_ensemble_activity(mouse, template_session, [recall])
+                 ) = cross_day_ensemble_activity(mouse, template_session, [recall], plot=False)
 
                 print(mouse + ': ' + str(patterns.shape[0]) + ' assemblies detected')
 
                 all_activations[context].append(np.mean(norm_activations[recall]))
-                all_freezing[context].append(np.sum(freezing[recall]/len(freezing[recall])))
+                all_freezing[context].append(np.sum(freezing[recall]/len(freezing[recall]))*100)
             except:
                 all_activations[context].append(np.nan)
                 all_freezing[context].append(np.nan)
 
     fig, ax = plt.subplots()
-    for context, color in zip(['shock', 'neutral'], ['b', 'xkcd:grey']):
+    for context, color in zip(['shock', 'neutral'], ['orange', 'xkcd:grey']):
         ax.scatter(all_activations[context], all_freezing[context], color=color)
 
         X = np.asarray(all_activations[context])
@@ -1087,7 +1253,7 @@ def Corr_Activations_to_Freezing(region='BLA', template_session='FC', save_fig=F
         order = np.argsort(X)
         ax.plot(X[order], predicted[order], color=color)
 
-    ax.set_ylabel('Freezing')
+    ax.set_ylabel('Freezing during Recall (%)')
     ax.set_xlabel('Norm. ensemble activation')
 
     p = {}
@@ -1104,15 +1270,16 @@ def Corr_Activations_to_Freezing(region='BLA', template_session='FC', save_fig=F
                  ', p = ' + str(np.round(p['shock'][1], 3)) + '\n'
                  'R = ' + str(np.round(p['neutral'][0], 3)) +
                  ', p = ' + str(np.round(p['neutral'][1], 3)))
+    ax.set_ylim([0, 70])
 
     fig.show()
 
     if save_fig:
         fname = os.path.join('C:\\Users\\William Mau\\Documents\\Projects\\S. Ramirez Fear Conditioning\\Figures',
-                             'Ensemble correlation to freezing_' + region + '_' + template_session + '.svg')
+                             'Ensemble correlation to freezing_' + region + '_' + template_session + '.pdf')
         fig.savefig(fname)
 
-    return fig
+    return fig, p
 
 
 def RecallEnsembleTimecourse(region=BLA_mice, test_sessions = ('E1_1', 'E2_1'),
@@ -1199,9 +1366,12 @@ def RecallEnsembleTimecourse(region=BLA_mice, test_sessions = ('E1_1', 'E2_1'),
 
 
 if __name__ == '__main__':
-    Plot_Freezing()
+    #Plot_Freezing()
     # for session in ['FC']:
     #     Corr_Activations_to_Freezing(template_session=session, save_fig=True)
-
+    #fig, p = Corr_Activations_to_Freezing()
+    #PlotPVCorrs()
     #RegressCorrTimeSeries()
+    cell_overlaps()
+    pass
     #CrossSessionEventRateCorr()

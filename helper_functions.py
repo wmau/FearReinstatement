@@ -164,7 +164,7 @@ def partial_z(arr, inds):
     return arr
 
 
-def pad_and_stack(arrs, pad_lengths):
+def pad_and_stack(arrs, pad_lengths, ax=0):
     """
     Stacks a list of arrays horizontally (column-wise) after
     padding or truncating, depending on the values in pad_lengths.
@@ -177,15 +177,22 @@ def pad_and_stack(arrs, pad_lengths):
     """
     for arr, pad_length in zip(arrs, pad_lengths):
         if pad_length < 0:
-            truncated = arr[:pad_length]
+            if arr.ndim > 1:
+                truncated = arr[:,:pad_length]
+            else:
+                truncated = arr[:pad_length]
             try:
                 x.append(truncated)
             except:
                 x = [truncated]
         else:
-            padded = np.pad(arr, (0, pad_length),
-                            mode='constant',
-                            constant_values=np.nan)
+            if arr.ndim > 1:
+                padded = np.pad(arr, [(0, 0), (0, pad_length)],
+                                mode='constant', constant_values=np.nan)
+            else:
+                padded = np.pad(arr, (0, pad_length),
+                                mode='constant',
+                                constant_values=np.nan)
             try:
                 x.append(padded)
             except:

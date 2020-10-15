@@ -203,7 +203,7 @@ def cross_day_ensemble_activity(mouse, template_session, test_sessions,
                                 neurons=None, dtype='traces',
                                 session=None, trim=True, start=None,
                                 end=None, method='ica', nullhyp='circ',
-                                n_shuffles=500, percentile=99.5):
+                                n_shuffles=500, percentile=99.5, plot=True):
     """
     Gets the ensemble activity across days, keeping the neuron weights
     from a template session and applying it to test sessions.
@@ -299,19 +299,20 @@ def cross_day_ensemble_activity(mouse, template_session, test_sessions,
             threshold_ensemble_activity(ensemble_strengths[this_session])
 
     # Plot activations of ensembles for each session.
-    for n_assembly in range(significance.nassemblies):
-        fig, ax = plt.subplots(len(all_sessions), sharey=True)
+    if plot:
+        for n_assembly in range(significance.nassemblies):
+            fig, ax = plt.subplots(len(all_sessions), sharey=True)
 
-        for i, this_session in enumerate(all_sessions):
-            # Get ensemble activation strength and time vectors.
-            ensembles = ensemble_strengths[this_session][n_assembly]
-            activity = ensemble_activations[this_session][n_assembly]
-            t = t_vectors[this_session]
-            frozen = freezing[this_session]
+            for i, this_session in enumerate(all_sessions):
+                # Get ensemble activation strength and time vectors.
+                ensembles = ensemble_strengths[this_session][n_assembly]
+                activity = ensemble_activations[this_session][n_assembly]
+                t = t_vectors[this_session]
+                frozen = freezing[this_session]
 
-            plot_ensemble_activations_with_freezing(t, ensembles,
-                                                    activity, frozen,
-                                                    ax=ax[i])
+                plot_ensemble_activations_with_freezing(t, ensembles,
+                                                        activity, frozen,
+                                                        ax=ax[i])
 
     # for i, this_session in enumerate(all_sessions):
     #     # Get ensemble activation strength and time vectors.
