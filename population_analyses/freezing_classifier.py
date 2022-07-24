@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold, \
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
 from sklearn.svm import SVC
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler, Imputer
+from sklearn.preprocessing import StandardScaler#, Imputer
 from microscoPy_load.cell_reg import load_cellreg_results, find_match_map_index, \
     find_cell_in_map
 from microscoPy_load import calcium_events as ca_events, calcium_traces as ca_traces, ff_video_fixer as ff

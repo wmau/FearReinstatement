@@ -113,6 +113,7 @@ def time_lapse_corr(mouse, session, ref_session='FC', bin_size=1,
                                                    neurons=neurons)
 
     event_rates[:, neurons==-1] = 0
+    event_rates[~np.isfinite(event_rates)] = 0
         # if z:
         #     event_rates[i,:] = zscore(event_rates[i,:])
 
@@ -153,9 +154,9 @@ def session_corr(mouse, session, ref_session='FC', corr=pearsonr):
     event_rates = d_pp.get_avg_event_rate(mouse, session,
                                           neurons=neurons)
 
-    correlation = corr(ref_event_rates, event_rates)[0]
+    correlation, pvalue = corr(ref_event_rates, event_rates)
 
-    return correlation
+    return correlation, pvalue
 
 
 def sort_PVs(mouse, session, ref_session='FC', bin_size=1,

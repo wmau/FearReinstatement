@@ -2,7 +2,7 @@ from glob import glob
 from os import path
 from plotting.plot_helper import ScrollPlot
 import matplotlib.pyplot as plt
-import pygame
+#import pygame
 import skvideo.io
 from skimage import color
 from pandas import read_csv

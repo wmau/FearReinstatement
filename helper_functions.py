@@ -1,6 +1,7 @@
 import numpy as np
 from itertools import groupby
 from scipy.stats import zscore
+import matplotlib.pyplot as plt
 
 def find_closest(array, value):
     value = float(value)
@@ -199,3 +200,27 @@ def pad_and_stack(arrs, pad_lengths, ax=0):
                 x = [padded]
 
     return np.hstack(x)
+
+def errorfill(x, y, yerr, color=None, alpha_fill=0.3, ax=None, label=None):
+    """
+    Line show_plot with error bars except the error bars are filled in
+    rather than the monstrosity from matplotlib.
+    :parameters
+    ---
+    x: array-like
+        x-axis values.
+    y: array-like, same length as x
+        y-axis values.
+    yerr: array-like, same length as x and y
+        Error around the y values.
+    """
+    ax = ax if ax is not None else plt.gca()
+    if color is None:
+        color = ax._get_lines.get_next_color()
+    if np.isscalar(yerr) or len(yerr) == len(y):
+        ymin = y - yerr
+        ymax = y + yerr
+    elif len(yerr) == 2:
+        ymin, ymax = yerr
+    ax.plot(x, y, color=color, label=label)
+    ax.fill_between(x, ymax, ymin, color=color, alpha=alpha_fill)
